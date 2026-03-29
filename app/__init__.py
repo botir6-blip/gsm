@@ -20,8 +20,13 @@ def create_app() -> Flask:
 
     db.init_app(app)
 
+    print("DB URI =", app.config["SQLALCHEMY_DATABASE_URI"])
+
     with app.app_context():
+        print("TABLES BEFORE CREATE =", list(db.metadata.tables.keys()))
         db.create_all()
+        print("TABLES AFTER CREATE =", list(db.metadata.tables.keys()))
+
         seed_reference_data(
             default_our_company_name=app.config["DEFAULT_OUR_COMPANY_NAME"],
             admin_username=app.config["DEFAULT_ADMIN_USERNAME"],
