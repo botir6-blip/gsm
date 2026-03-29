@@ -80,7 +80,10 @@ def normalize_date(value):
         return value.date()
 
     try:
-        return pd.to_datetime(value, dayfirst=True, errors="coerce").date()
+        parsed = pd.to_datetime(value, dayfirst=True, errors="coerce")
+        if pd.isna(parsed):
+            return None
+        return parsed.date()
     except Exception:
         return None
 
@@ -109,6 +112,8 @@ def detect_company(text):
         return "EMS"
     if "saneg" in t:
         return "SANEG"
+    if "art oil" in t:
+        return "ART OIL TRANS"
 
     return text.strip()
 
@@ -122,17 +127,85 @@ def detect_delivery_type(text):
         return "wagon"
     if "бензовоз" in t or "benzovoz" in t:
         return "fuel_truck"
+    if "авто" in t:
+        return "fuel_truck"
 
     return None
+
+
+def clean_col_name(text):
+    return (
+        str(text)
+        .strip()
+        .lower()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+        .replace("ё", "е")
+        .replace(".", "")
+    )
 
 
 def find_col(df, possible_names):
-    lower_map = {str(c).strip().lower(): c for c in df.columns}
+    normalized = {clean_col_name(c): c for c in df.columns}
     for name in possible_names:
-        key = name.strip().lower()
-        if key in lower_map:
-            return lower_map[key]
+        key = clean_col_name(name)
+        if key in normalized:
+            return normalized[key]
     return None
+
+
+def row_joined_text(row_values):
+    return " | ".join(
+        [str(v).strip().lower() for v in row_values if pd.notna(v) and str(v).strip()]
+    )
+
+
+def load_receipt_sheet(xls, sheet_name):
+    raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+    header_row = None
+
+    for i in range(min(25, len(raw))):
+        joined = row_joined_text(raw.iloc[i].tolist())
+        if (
+            "дата" in joined
+            and ("ттн" in joined or "акт" in joined or "№" in joined)
+            and (
+                "обьем/л" in joined
+                or "объём/л" in joined
+                or "объем/л" in joined
+                or "литр" in joined
+            )
+        ):
+            header_row = i
+            break
+
+    if header_row is None:
+        return pd.DataFrame()
+
+    df = pd.read_excel(xls, sheet_name=sheet_name, header=header_row)
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.dropna(how="all")
+    return df
+
+
+def load_issue_sheet(xls, sheet_name):
+    raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+    header_row = None
+
+    for i in range(min(25, len(raw))):
+        joined = row_joined_text(raw.iloc[i].tolist())
+        if "дата" in joined and ("№ттн" in joined or "ттн" in joined) and "литр" in joined:
+            header_row = i
+            break
+
+    if header_row is None:
+        return pd.DataFrame()
+
+    df = pd.read_excel(xls, sheet_name=sheet_name, header=header_row)
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.dropna(how="all")
+    return df
 
 
 def import_sheet(file_bytes, source_file_name):
@@ -196,25 +269,27 @@ def import_sheet(file_bytes, source_file_name):
         if not (lower_sheet.startswith("приход") or lower_sheet.startswith("расход")):
             continue
 
-        df = pd.read_excel(xls, sheet_name=sheet_name)
-        df.columns = [str(c).strip() for c in df.columns]
+        if lower_sheet.startswith("приход"):
+            df = load_receipt_sheet(xls, sheet_name)
+        else:
+            df = load_issue_sheet(xls, sheet_name)
 
         if df.empty:
             continue
 
-        date_col = find_col(df, ["Дата", "дата"])
-        liters_col = find_col(df, ["обьем/л", "объём/л", "литр", "литры", "Литр"])
-        kg_col = find_col(df, ["Масса/кг", "кг", "Кг"])
-        doc_col = find_col(df, ["ТТН", "№ТТН", "№ ттн", "Номер ТТН"])
+        date_col = find_col(df, ["Дата"])
+        liters_col = find_col(df, ["обьем/л", "объём/л", "объем/л", "литр", "литры"])
+        kg_col = find_col(df, ["Масса/кг", "кг"])
+        doc_col = find_col(df, ["ТТН", "№ТТН", "№ ттн", "Номер ТТН", "Акт"])
         source_col = find_col(df, ["От куда", "Откуда"])
         dest_col = find_col(df, ["Куда отправлено", "Куда"])
         object_col = find_col(df, ["в какой объект", "Объект"])
         bb_col = find_col(df, ["№ б/б", "б/б", "№б/б"])
         field_col = find_col(df, ["Месторождения", "Месторождение"])
-        density_col = find_col(df, ["Уд.вес", "Удельный вес"])
+        density_col = find_col(df, ["Уд.вес", "Удельный вес", "плотность"])
         temp_col = find_col(df, ["Температура"])
         note_col = find_col(df, ["Примечание", "Примечания", "Изоҳ"])
-        company_col = find_col(df, ["Столбец1", "Компания"])
+        company_col = find_col(df, ["Столбец1", "Компания", "Организация"])
 
         for idx, row in df.iterrows():
             operation_date = normalize_date(row[date_col]) if date_col else None
@@ -235,8 +310,10 @@ def import_sheet(file_bytes, source_file_name):
                 accountable_company_name = owner_company_name
 
                 supplier_name = source_name
-                delivery_type = detect_delivery_type(normalize_text(row[note_col]) if note_col else None)
-                comment = normalize_text(row[note_col]) if note_col else None
+
+                note_text = normalize_text(row[note_col]) if note_col else None
+                delivery_type = detect_delivery_type(note_text)
+                comment = note_text
 
             else:
                 operation_type = "issue"
@@ -250,7 +327,7 @@ def import_sheet(file_bytes, source_file_name):
 
                 supplier_name = None
                 delivery_type = "fuel_truck"
-                comment = None
+                comment = normalize_text(row[note_col]) if note_col else None
 
             rows_to_insert.append({
                 "operation_type": operation_type,
@@ -273,7 +350,7 @@ def import_sheet(file_bytes, source_file_name):
                 "comment": comment,
                 "source_file": source_file_name,
                 "source_sheet": sheet_name,
-                "source_row": int(idx) + 2,
+                "source_row": int(idx) + 1,
             })
 
     if rows_to_insert:
@@ -320,74 +397,139 @@ def index():
         <meta charset="utf-8">
         <title>ГСМ Импорт</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7f7; }
-            .card { background: white; padding: 16px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-            table { width: 100%; border-collapse: collapse; background: white; }
-            th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; }
-            th { background: #f0f0f0; }
-            .stats { display: flex; gap: 16px; flex-wrap: wrap; }
-            .stat { padding: 12px 16px; background: #eef3ff; border-radius: 10px; min-width: 180px; }
-            .flash { padding: 12px; border-radius: 8px; margin-bottom: 12px; background: #e8f5e9; }
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                background: #f2f2f2;
+            }
+            .wrap {
+                max-width: 1800px;
+                margin: 0 auto;
+                padding: 0;
+            }
+            .card {
+                background: white;
+                padding: 18px;
+                border-radius: 14px;
+                margin-bottom: 18px;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            }
+            h2, h3 {
+                margin-top: 0;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: white;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 10px 8px;
+                font-size: 14px;
+                text-align: center;
+            }
+            th {
+                background: #f0f0f0;
+            }
+            .stats {
+                display: flex;
+                gap: 20px;
+                flex-wrap: wrap;
+            }
+            .stat {
+                padding: 14px 18px;
+                background: #e9edf7;
+                border-radius: 12px;
+                min-width: 220px;
+                font-size: 18px;
+                font-weight: bold;
+            }
+            .flash {
+                padding: 14px;
+                border-radius: 10px;
+                margin-bottom: 14px;
+                background: #e8f5e9;
+                font-size: 18px;
+            }
+            .upload-row {
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            button {
+                padding: 8px 16px;
+                font-size: 16px;
+                cursor: pointer;
+            }
+            input[type="file"] {
+                font-size: 16px;
+            }
         </style>
     </head>
     <body>
-        <div class="card">
-            <h2>ГСМ реестр импорт</h2>
-            {% with messages = get_flashed_messages() %}
-              {% if messages %}
-                {% for msg in messages %}
-                  <div class="flash">{{ msg }}</div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
+        <div class="wrap">
+            <div class="card">
+                <h2>ГСМ реестр импорт</h2>
 
-            <form action="/upload" method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept=".xlsx,.xls" required>
-                <button type="submit">Excel юклаш</button>
-            </form>
-        </div>
+                {% with messages = get_flashed_messages() %}
+                  {% if messages %}
+                    {% for msg in messages %}
+                      <div class="flash">{{ msg }}</div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
 
-        <div class="card">
-            <h3>Қисқача ҳисоб</h3>
-            <div class="stats">
-                <div class="stat"><strong>Жами кирим:</strong><br>{{ stats.total_receipt }}</div>
-                <div class="stat"><strong>Жами чиқим:</strong><br>{{ stats.total_issue }}</div>
-                <div class="stat"><strong>Соф қолдиқ:</strong><br>{{ stats.balance }}</div>
+                <form action="/upload" method="post" enctype="multipart/form-data">
+                    <div class="upload-row">
+                        <input type="file" name="file" accept=".xlsx,.xls" required>
+                        <button type="submit">Excel юклаш</button>
+                    </div>
+                </form>
             </div>
-        </div>
 
-        <div class="card">
-            <h3>Охирги 100 операция</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Сана</th>
-                        <th>Тури</th>
-                        <th>Ҳужжат</th>
-                        <th>Қаердан</th>
-                        <th>Қаерга</th>
-                        <th>Компания</th>
-                        <th>Литр</th>
-                        <th>Лист</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for row in rows %}
-                    <tr>
-                        <td>{{ row.id }}</td>
-                        <td>{{ row.operation_date }}</td>
-                        <td>{{ row.operation_type }}</td>
-                        <td>{{ row.doc_number or "" }}</td>
-                        <td>{{ row.source_name or "" }}</td>
-                        <td>{{ row.destination_name or "" }}</td>
-                        <td>{{ row.owner_company_name or "" }}</td>
-                        <td>{{ row.liters }}</td>
-                        <td>{{ row.source_sheet or "" }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+            <div class="card">
+                <h3>Қисқача ҳисоб</h3>
+                <div class="stats">
+                    <div class="stat"><strong>Жами кирим:</strong><br>{{ stats.total_receipt }}</div>
+                    <div class="stat"><strong>Жами чиқим:</strong><br>{{ stats.total_issue }}</div>
+                    <div class="stat"><strong>Соф қолдиқ:</strong><br>{{ stats.balance }}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Охирги 100 операция</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Сана</th>
+                            <th>Тури</th>
+                            <th>Ҳужжат</th>
+                            <th>Қаердан</th>
+                            <th>Қаерга</th>
+                            <th>Компания</th>
+                            <th>Литр</th>
+                            <th>Лист</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in rows %}
+                        <tr>
+                            <td>{{ row.id }}</td>
+                            <td>{{ row.operation_date }}</td>
+                            <td>{{ row.operation_type }}</td>
+                            <td>{{ row.doc_number or "" }}</td>
+                            <td>{{ row.source_name or "" }}</td>
+                            <td>{{ row.destination_name or "" }}</td>
+                            <td>{{ row.owner_company_name or "" }}</td>
+                            <td>{{ row.liters }}</td>
+                            <td>{{ row.source_sheet or "" }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </body>
     </html>
