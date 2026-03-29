@@ -165,20 +165,33 @@ def load_receipt_sheet(xls, sheet_name):
     raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
     header_row = None
 
-    for i in range(min(25, len(raw))):
-        joined = row_joined_text(raw.iloc[i].tolist())
-        if (
-            "дата" in joined
-            and ("ттн" in joined or "акт" in joined or "№" in joined)
-            and (
-                "обьем/л" in joined
-                or "объём/л" in joined
-                or "объем/л" in joined
-                or "литр" in joined
-            )
-        ):
+    for i in range(min(40, len(raw))):
+        vals = [str(v).strip().lower() for v in raw.iloc[i].tolist() if pd.notna(v) and str(v).strip()]
+        joined = " | ".join(vals)
+
+        has_date = "дата" in joined
+        has_doc = ("ттн" in joined) or ("акт" in joined) or ("№" in joined)
+        has_volume = (
+            "обьем/л" in joined
+            or "объём/л" in joined
+            or "объем/л" in joined
+            or "литр" in joined
+            or "обьем" in joined
+            or "объем" in joined
+        )
+
+        if has_date and has_doc and has_volume:
             header_row = i
             break
+
+    if header_row is None:
+        # захира вариант: "дата" ва "объем" бор қаторни олади
+        for i in range(min(40, len(raw))):
+            vals = [str(v).strip().lower() for v in raw.iloc[i].tolist() if pd.notna(v) and str(v).strip()]
+            joined = " | ".join(vals)
+            if "дата" in joined and ("обьем" in joined or "объем" in joined or "литр" in joined):
+                header_row = i
+                break
 
     if header_row is None:
         return pd.DataFrame()
@@ -187,7 +200,6 @@ def load_receipt_sheet(xls, sheet_name):
     df.columns = [str(c).strip() for c in df.columns]
     df = df.dropna(how="all")
     return df
-
 
 def load_issue_sheet(xls, sheet_name):
     raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
@@ -553,6 +565,33 @@ def upload():
 
     return redirect(url_for("index"))
 
+@app.route("/upload", methods=["POST"])
+def upload():
+    file = request.files.get("file")
+    if not file or not file.filename:
+        flash("Файл танланмаган")
+        return redirect(url_for("index"))
+
+    try:
+        file_bytes = file.read()
+        inserted = import_sheet(file_bytes, file.filename)
+        flash(f"Муваффақиятли импорт қилинди: {inserted} қатор")
+    except Exception as e:
+        flash(f"Хато: {e}")
+
+    return redirect(url_for("index"))
+
+
+@app.route("/clear")
+def clear_data():
+    execute_query("DELETE FROM operations_simple")
+    flash("База тозаланди")
+    return redirect(url_for("index"))
+
+
+@app.route("/health")
+def health():
+    return {"ok": True}
 
 @app.route("/health")
 def health():
