@@ -20,18 +20,27 @@ def create_app() -> Flask:
 
     db.init_app(app)
 
-    print("DB URI =", app.config["SQLALCHEMY_DATABASE_URI"])
-
     with app.app_context():
-        print("TABLES BEFORE CREATE =", list(db.metadata.tables.keys()))
-        db.create_all()
-        print("TABLES AFTER CREATE =", list(db.metadata.tables.keys()))
+        print("DB URI =", app.config["SQLALCHEMY_DATABASE_URI"], flush=True)
+        print("TABLES BEFORE CREATE =", list(db.metadata.tables.keys()), flush=True)
 
-        seed_reference_data(
-            default_our_company_name=app.config["DEFAULT_OUR_COMPANY_NAME"],
-            admin_username=app.config["DEFAULT_ADMIN_USERNAME"],
-            admin_password=app.config["DEFAULT_ADMIN_PASSWORD"],
-        )
+        try:
+            db.create_all()
+            print("CREATE_ALL_OK", flush=True)
+            print("TABLES AFTER CREATE =", list(db.metadata.tables.keys()), flush=True)
+
+            seed_reference_data(
+                default_our_company_name=app.config["DEFAULT_OUR_COMPANY_NAME"],
+                admin_username=app.config["DEFAULT_ADMIN_USERNAME"],
+                admin_password=app.config["DEFAULT_ADMIN_PASSWORD"],
+            )
+            print("SEED_OK", flush=True)
+
+        except Exception as e:
+            import traceback
+            print("CREATE_ALL_ERROR =", repr(e), flush=True)
+            traceback.print_exc()
+            raise
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(audit_bp)
