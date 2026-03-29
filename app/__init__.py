@@ -1,4 +1,5 @@
 from flask import Flask
+from sqlalchemy import text
 
 from config import Config
 from .extensions import db
@@ -25,20 +26,34 @@ def create_app() -> Flask:
         print("TABLES BEFORE CREATE =", list(db.metadata.tables.keys()), flush=True)
 
         try:
+            db.session.execute(text("SELECT 1"))
+            print("DB_PING_OK", flush=True)
+        except Exception as e:
+            import traceback
+            print("DB_PING_ERROR =", repr(e), flush=True)
+            traceback.print_exc()
+            raise
+
+        try:
             db.create_all()
             print("CREATE_ALL_OK", flush=True)
             print("TABLES AFTER CREATE =", list(db.metadata.tables.keys()), flush=True)
+        except Exception as e:
+            import traceback
+            print("CREATE_ALL_ERROR =", repr(e), flush=True)
+            traceback.print_exc()
+            raise
 
+        try:
             seed_reference_data(
                 default_our_company_name=app.config["DEFAULT_OUR_COMPANY_NAME"],
                 admin_username=app.config["DEFAULT_ADMIN_USERNAME"],
                 admin_password=app.config["DEFAULT_ADMIN_PASSWORD"],
             )
             print("SEED_OK", flush=True)
-
         except Exception as e:
             import traceback
-            print("CREATE_ALL_ERROR =", repr(e), flush=True)
+            print("SEED_ERROR =", repr(e), flush=True)
             traceback.print_exc()
             raise
 
