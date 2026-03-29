@@ -2,8 +2,6 @@ from flask import Flask
 
 from config import Config
 from .extensions import db
-
-# МОДЕЛЛАРНИ АЛБАТТА create_all() дан олдин импорт қилиш керак
 from . import models
 
 from .routes.audit import audit_bp
