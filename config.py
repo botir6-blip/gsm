@@ -3,10 +3,16 @@ import os
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-please")
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", "sqlite:///gsm_audit.db"
-    )
+
+    database_url = os.environ.get("DATABASE_URL", "sqlite:///gsm_audit.db")
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+    SQLALCHEMY_DATABASE_URI = database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
     APP_TITLE = os.environ.get("APP_TITLE", "ГСМ аудит ва склад ҳисоби")
     DEFAULT_ADMIN_USERNAME = os.environ.get("DEFAULT_ADMIN_USERNAME", "admin")
     DEFAULT_ADMIN_PASSWORD = os.environ.get("DEFAULT_ADMIN_PASSWORD", "admin123")
