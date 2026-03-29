@@ -1,8 +1,11 @@
 from flask import Flask
 
 from config import Config
-
 from .extensions import db
+
+# МОДЕЛЛАРНИ АЛБАТТА create_all() дан олдин импорт қилиш керак
+from . import models
+
 from .routes.audit import audit_bp
 from .routes.auth import auth_bp
 from .routes.companies import companies_bp
@@ -34,4 +37,5 @@ def create_app() -> Flask:
     app.register_blueprint(warehouses_bp)
     app.register_blueprint(objects_bp)
     app.register_blueprint(transactions_bp)
+
     return app
