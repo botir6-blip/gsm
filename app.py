@@ -565,23 +565,6 @@ def upload():
 
     return redirect(url_for("index"))
 
-@app.route("/upload", methods=["POST"])
-def upload():
-    file = request.files.get("file")
-    if not file or not file.filename:
-        flash("Файл танланмаган")
-        return redirect(url_for("index"))
-
-    try:
-        file_bytes = file.read()
-        inserted = import_sheet(file_bytes, file.filename)
-        flash(f"Муваффақиятли импорт қилинди: {inserted} қатор")
-    except Exception as e:
-        flash(f"Хато: {e}")
-
-    return redirect(url_for("index"))
-
-
 @app.route("/clear")
 def clear_data():
     execute_query("DELETE FROM operations_simple")
