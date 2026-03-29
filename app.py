@@ -565,16 +565,13 @@ def upload():
 
     return redirect(url_for("index"))
 
+
 @app.route("/clear")
 def clear_data():
     execute_query("DELETE FROM operations_simple")
     flash("База тозаланди")
     return redirect(url_for("index"))
 
-
-@app.route("/health")
-def health():
-    return {"ok": True}
 
 @app.route("/health")
 def health():
