@@ -26,7 +26,8 @@ def create_app() -> Flask:
         print("TABLES BEFORE CREATE =", list(db.metadata.tables.keys()), flush=True)
 
         try:
-            db.session.execute(text("SELECT 1"))
+            with db.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
             print("DB_PING_OK", flush=True)
         except Exception as e:
             import traceback
