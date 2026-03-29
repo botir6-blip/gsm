@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Янги компания</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('companies.create_company') }}">
+          <div class="mb-3">
+            <label class="form-label">Ном</label>
+            <input class="form-control" name="name" required>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_our_company" value="1" id="is_our_company">
+            <label class="form-check-label" for="is_our_company">Бизнинг компания</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Изоҳ</label>
+            <textarea class="form-control" name="note" rows="3"></textarea>
+          </div>
+          <button class="btn btn-primary">Сақлаш</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Компаниялар</div>
+      <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead><tr><th>Ном</th><th>Тоифа</th><th>Изоҳ</th></tr></thead>
+          <tbody>
+            {% for company in companies %}
+            <tr>
+              <td>{{ company.name }}</td>
+              <td>{% if company.is_our_company %}Бизнинг{% else %}Контрагент{% endif %}</td>
+              <td>{{ company.note or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ config.APP_TITLE }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">ГСМ аудит</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions.list_transactions') }}">Ҳужжатлар</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions.create_transaction_view') }}">Янги ҳужжат</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions.monthly_balances') }}">Ойлик қолдиқлар</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions.settlements') }}">Қарз-сальдо</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('companies.list_companies') }}">Компаниялар</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('warehouses.list_warehouses') }}">Складлар</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('objects.list_objects') }}">Объектлар</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('audit.list_audit_logs') }}">Аудит журнали</a></li>
+      </ul>
+      {% if g.user %}
+      <span class="navbar-text text-white me-3">{{ g.user.full_name }} ({{ g.user.role }})</span>
+      <a class="btn btn-outline-light btn-sm" href="{{ url_for('auth.logout') }}">Чиқиш</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid py-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header fw-bold">{% if tx %}Ҳужжатни таҳрирлаш{% else %}Янги ҳужжат{% endif %}</div>
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      <div class="col-md-3"><label class="form-label">Ҳужжат №</label><input class="form-control" name="doc_no" value="{{ tx.doc_no if tx else '' }}" required></div>
+      <div class="col-md-3"><label class="form-label">Сана</label><input type="date" class="form-control" name="doc_date" value="{{ tx.doc_date.isoformat() if tx else '' }}" required></div>
+      <div class="col-md-3">
+        <label class="form-label">Операция тури</label>
+        <select class="form-select" name="operation_type" required>
+          {% for key, value in operation_labels.items() %}
+          <option value="{{ key }}" {% if tx and tx.operation_type == key %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3"><label class="form-label">Миқдор, кг</label><input type="number" step="0.001" class="form-control" name="qty_kg" value="{{ tx.qty_kg if tx else '' }}" required></div>
+
+      <div class="col-md-4">
+        <label class="form-label">Ёқилғи эгаси</label>
+        <select class="form-select" name="owner_company_id" required>
+          <option value="">Танланг</option>
+          {% for company in companies %}
+          <option value="{{ company.id }}" {% if tx and tx.owner_company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Контрагент компания</label>
+        <select class="form-select" name="counterparty_company_id">
+          <option value="">Танланг</option>
+          {% for company in companies %}
+          <option value="{{ company.id }}" {% if tx and tx.counterparty_company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Ташиш тури</label>
+        <select class="form-select" name="carrier_type">
+          {% for key, value in carrier_labels.items() %}
+          <option value="{{ key }}" {% if tx and tx.carrier_type == key %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Чиқиш склади</label>
+        <select class="form-select" name="source_warehouse_id">
+          <option value="">Танланг</option>
+          {% for warehouse in warehouses %}
+          <option value="{{ warehouse.id }}" {% if tx and tx.source_warehouse_id == warehouse.id %}selected{% endif %}>{{ warehouse.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Кириш склади</label>
+        <select class="form-select" name="dest_warehouse_id">
+          <option value="">Танланг</option>
+          {% for warehouse in warehouses %}
+          <option value="{{ warehouse.id }}" {% if tx and tx.dest_warehouse_id == warehouse.id %}selected{% endif %}>{{ warehouse.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Объект</label>
+        <select class="form-select" name="object_id">
+          <option value="">Танланг</option>
+          {% for obj in objects %}
+          <option value="{{ obj.id }}" {% if tx and tx.object_id == obj.id %}selected{% endif %}>{{ obj.name }} — {{ obj.company.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4"><label class="form-label">Завод</label><input class="form-control" name="refinery_name" value="{{ tx.refinery_name if tx else '' }}" placeholder="ФНПЗ / БНПЗ"></div>
+      <div class="col-md-8"><label class="form-label">Изоҳ</label><textarea class="form-control" name="comment" rows="3">{{ tx.comment if tx else '' }}</textarea></div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary">Сақлаш</button>
+        <a class="btn btn-secondary" href="{{ url_for('transactions.list_transactions') }}">Бекор қилиш</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

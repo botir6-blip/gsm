@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card metric-card"><div class="card-body"><div class="label">Ҳужжатлар</div><div class="value">{{ metrics.total_docs }}</div></div></div></div>
+  <div class="col-md-3"><div class="card metric-card"><div class="card-body"><div class="label">Компаниялар</div><div class="value">{{ metrics.total_companies }}</div></div></div></div>
+  <div class="col-md-3"><div class="card metric-card"><div class="card-body"><div class="label">Складлар</div><div class="value">{{ metrics.total_warehouses }}</div></div></div></div>
+  <div class="col-md-3"><div class="card metric-card"><div class="card-body"><div class="label">Объектлар</div><div class="value">{{ metrics.total_objects }}</div></div></div></div>
+  <div class="col-md-4"><div class="card metric-card success"><div class="card-body"><div class="label">Бизнинг жами қолдиқ</div><div class="value">{{ metrics.our_stock }} кг</div></div></div></div>
+  <div class="col-md-4"><div class="card metric-card warning"><div class="card-body"><div class="label">Бизнинг талаб (receivable)</div><div class="value">{{ metrics.receivable }} кг</div></div></div></div>
+  <div class="col-md-4"><div class="card metric-card danger"><div class="card-body"><div class="label">Бизнинг қарз (payable)</div><div class="value">{{ metrics.payable }} кг</div></div></div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Склад кесимида жорий қолдиқ</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Склад</th>
+              <th>Ёқилғи эгаси</th>
+              <th class="text-end">Қолдиқ, кг</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in stock_rows %}
+            <tr>
+              <td>{{ row.warehouse_name }}</td>
+              <td>{{ row.owner_company_name }}</td>
+              <td class="text-end">{{ row.balance_kg }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Контрагентлар билан сальдо</div>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Компания</th>
+              <th>Ҳолат</th>
+              <th class="text-end">Кг</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in settlement_rows %}
+            <tr>
+              <td>{{ row.company_name }}</td>
+              <td>{{ row.status }}</td>
+              <td class="text-end">{{ row.net_qty_kg }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

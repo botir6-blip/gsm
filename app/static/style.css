@@ -1,0 +1,30 @@
+body {
+  background: #f5f7fb;
+}
+.metric-card {
+  border: 0;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+.metric-card .label {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+.metric-card .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-top: 0.35rem;
+}
+.metric-card.success {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+}
+.metric-card.warning {
+  background: linear-gradient(135deg, #fffbeb, #fde68a);
+}
+.metric-card.danger {
+  background: linear-gradient(135deg, #fef2f2, #fecaca);
+}
+.card-header {
+  background: #fff;
+}
+
+.small-json {max-width: 280px; white-space: pre-wrap; word-break: break-word; margin: 0;}

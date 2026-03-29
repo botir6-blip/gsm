@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="fw-bold">Ҳужжатлар журнали</span>
+    <form method="get" class="d-flex gap-2 flex-wrap">
+      <select class="form-select form-select-sm" name="operation_type">
+        <option value="">Барча операциялар</option>
+        {% for key, value in operation_labels.items() %}
+          <option value="{{ key }}" {% if key == selected_operation_type %}selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+      <select class="form-select form-select-sm" name="company_id">
+        <option value="">Барча компаниялар</option>
+        {% for company in companies %}
+          <option value="{{ company.id }}" {% if company.id == selected_company_id %}selected{% endif %}>{{ company.name }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm btn-primary">Фильтр</button>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Сана</th>
+          <th>№</th>
+          <th>Операция</th>
+          <th>Эгаси</th>
+          <th>Ким билан</th>
+          <th>Манба</th>
+          <th>Қабул</th>
+          <th>Объект</th>
+          <th class="text-end">Кг</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in transactions %}
+        <tr>
+          <td>{{ tx.doc_date.strftime('%Y-%m-%d') }}</td>
+          <td>{{ tx.doc_no }}</td>
+          <td>{{ operation_labels.get(tx.operation_type, tx.operation_type) }}</td>
+          <td>{{ tx.owner_company.name }}</td>
+          <td>{{ tx.counterparty_company.name if tx.counterparty_company else '' }}</td>
+          <td>{{ tx.source_warehouse.name if tx.source_warehouse else '' }}</td>
+          <td>{{ tx.dest_warehouse.name if tx.dest_warehouse else '' }}</td>
+          <td>{{ tx.project_object.name if tx.project_object else '' }}</td>
+          <td class="text-end">{{ tx.qty_kg }}</td>
+          <td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('transactions.edit_transaction', tx_id=tx.id) }}">Таҳрир</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

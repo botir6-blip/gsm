@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Янги склад</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('warehouses.create_warehouse') }}">
+          <div class="mb-3"><label class="form-label">Склад номи</label><input class="form-control" name="name" required></div>
+          <div class="mb-3">
+            <label class="form-label">Склад кимга қарашли</label>
+            <select class="form-select" name="host_company_id" required>
+              <option value="">Танланг</option>
+              {% for company in companies %}
+              <option value="{{ company.id }}">{{ company.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label">Шаҳар/ҳудуд</label><input class="form-control" name="city"></div>
+          <div class="mb-3"><label class="form-label">Изоҳ</label><textarea class="form-control" name="note"></textarea></div>
+          <button class="btn btn-primary">Сақлаш</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Складлар</div>
+      <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead><tr><th>Ном</th><th>Хост компания</th><th>Шаҳар</th><th>Изоҳ</th></tr></thead>
+          <tbody>
+            {% for warehouse in warehouses %}
+            <tr>
+              <td>{{ warehouse.name }}</td>
+              <td>{{ warehouse.host_company.name }}</td>
+              <td>{{ warehouse.city or '' }}</td>
+              <td>{{ warehouse.note or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

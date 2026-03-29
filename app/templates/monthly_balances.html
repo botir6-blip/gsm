@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-header fw-bold">Складлар бўйича ойлик қолдиқлар</div>
+  <div class="card-body p-0">
+    {% for month, rows in grouped.items() %}
+      <div class="border-bottom p-3">
+        <h5 class="mb-3">{{ month }}</h5>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <thead><tr><th>Склад</th><th>Ёқилғи эгаси</th><th class="text-end">Қолдиқ, кг</th></tr></thead>
+            <tbody>
+              {% for row in rows %}
+              <tr>
+                <td>{{ row.warehouse_name }}</td>
+                <td>{{ row.owner_company_name }}</td>
+                <td class="text-end">{{ row.balance_kg }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

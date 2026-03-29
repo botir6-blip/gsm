@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Янги объект</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('objects.create_object') }}">
+          <div class="mb-3"><label class="form-label">Объект номи</label><input class="form-control" name="name" required></div>
+          <div class="mb-3">
+            <label class="form-label">Қайси компанияга тегишли</label>
+            <select class="form-select" name="company_id" required>
+              <option value="">Танланг</option>
+              {% for company in companies %}
+              <option value="{{ company.id }}">{{ company.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label">Проект</label><input class="form-control" name="project_name"></div>
+          <div class="mb-3"><label class="form-label">Ҳудуд</label><input class="form-control" name="region"></div>
+          <div class="mb-3"><label class="form-label">Изоҳ</label><textarea class="form-control" name="note"></textarea></div>
+          <button class="btn btn-primary">Сақлаш</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Объектлар</span>
+        <form method="get" class="d-flex gap-2">
+          <select class="form-select form-select-sm" name="company_id" onchange="this.form.submit()">
+            <option value="">Барчаси</option>
+            {% for company in companies %}
+            <option value="{{ company.id }}" {% if selected_company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead><tr><th>Объект</th><th>Компания</th><th>Проект</th><th>Ҳудуд</th><th>Изоҳ</th></tr></thead>
+          <tbody>
+            {% for obj in objects %}
+            <tr>
+              <td>{{ obj.name }}</td>
+              <td>{{ obj.company.name }}</td>
+              <td>{{ obj.project_name or '' }}</td>
+              <td>{{ obj.region or '' }}</td>
+              <td>{{ obj.note or '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
