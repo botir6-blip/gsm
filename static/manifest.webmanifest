@@ -1,0 +1,15 @@
+{
+  "name": "SIM Бонус Ҳисоб",
+  "short_name": "SIM Бонус",
+  "description": "Ходимлар бўйича SIM-карта сотуви ва бонус ҳисоботи",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#eef3f8",
+  "theme_color": "#0f172a",
+  "icons": [
+    {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

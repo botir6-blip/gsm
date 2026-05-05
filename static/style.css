@@ -181,3 +181,15 @@ label { display: flex; flex-direction: column; gap: 6px; color: #334155; font-we
     .span-2 { grid-column: span 1; }
     .nav { grid-template-columns: 1fr; }
 }
+
+
+.topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.install-app-button { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.install-app-button:hover { background: #dbeafe; }
+.offline-body { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: linear-gradient(135deg, #e0f2fe, #eef2ff); }
+.offline-card { max-width: 520px; background: white; border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--shadow); padding: 24px; text-align: center; }
+.offline-card h1 { margin-top: 0; }
+@media (max-width: 650px) {
+    .topbar-actions { width: 100%; }
+    .topbar-actions .btn, .topbar-actions .user-pill { width: 100%; }
+}
