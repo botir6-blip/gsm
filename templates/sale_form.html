@@ -2,11 +2,13 @@
 {% block title %}{% if sale %}Сотувни ўзгартириш{% else %}Кунлик сотув киритиш{% endif %}{% endblock %}
 {% block header %}{% if sale %}Сотувни ўзгартириш{% else %}Кунлик сотув киритиш{% endif %}{% endblock %}
 {% block content %}
-<section class="panel narrow">
-    <div class="panel-title">{% if sale %}Маълумотни таҳрирлаш{% else %}Янги сотув{% endif %}</div>
+<section class="panel {% if sale %}narrow{% else %}daily-sale-panel{% endif %}">
+    <div class="panel-title">{% if sale %}Маълумотни таҳрирлаш{% else %}Янги кунлик сотув{% endif %}</div>
     {% if not employees or not tariffs %}
         <div class="alert warning">Аввал ходим ва тариф киритинг.</div>
     {% endif %}
+
+    {% if sale %}
     <form method="post" class="form-grid">
         <label>Сана
             <input type="date" name="sale_date" value="{{ sale.sale_date if sale else today }}" required>
@@ -33,15 +35,58 @@
         <label class="span-2">Изоҳ
             <input type="text" name="comment" value="{{ sale.comment if sale and sale.comment else '' }}" placeholder="Ихтиёрий">
         </label>
-        {% if sale %}
         <label class="span-2">Ўзгартириш сабаби <span class="required">*</span>
             <input type="text" name="reason" required placeholder="Масалан: сотув сони нотўғри киритилган">
         </label>
-        {% endif %}
         <div class="actions span-2">
             <button type="submit" class="btn primary">Сақлаш</button>
             <a href="{{ url_for('sales_journal') }}" class="btn ghost">Журналга ўтиш</a>
         </div>
     </form>
+    {% else %}
+    <form method="post" class="daily-sale-form">
+        <div class="form-grid daily-head-grid">
+            <label>Сана
+                <input type="date" name="sale_date" value="{{ today }}" required>
+            </label>
+            <label>Ходим Ф.И.О.
+                <select name="employee_id" required>
+                    <option value="">Танланг...</option>
+                    {% for emp in employees %}
+                        <option value="{{ emp.id }}" {% if selected_employee_id and selected_employee_id == emp.id %}selected{% endif %}>{{ emp.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="span-2">Изоҳ
+                <input type="text" name="comment" placeholder="Ихтиёрий, масалан: кунлик сотув">
+            </label>
+        </div>
+
+        <div class="alert info daily-hint">
+            Сана ва ходимни танланг. Кейин ҳар бир тариф бўйича сотилган сонини киритинг. Сотув бўлмаган тарифларни бўш қолдириш мумкин.
+        </div>
+
+        <div class="tariff-entry-list">
+            {% for tariff in tariffs %}
+            <div class="tariff-entry-row">
+                <div class="tariff-entry-info">
+                    <div class="tariff-entry-name">{{ tariff.name|tariff_name }}</div>
+                    <div class="tariff-entry-bonus">1 дона бонус: {{ tariff.bonus_per_item|money }} сўм</div>
+                </div>
+                <label class="tariff-entry-qty">Сони
+                    <input type="number" name="quantity_{{ tariff.id }}" min="0" step="1" inputmode="numeric" placeholder="0">
+                </label>
+            </div>
+            {% else %}
+            <div class="empty">Тарифлар рўйхати бўш</div>
+            {% endfor %}
+        </div>
+
+        <div class="actions daily-actions">
+            <button type="submit" class="btn primary">Ҳаммасини сақлаш</button>
+            <a href="{{ url_for('sales_journal') }}" class="btn ghost">Журналга ўтиш</a>
+        </div>
+    </form>
+    {% endif %}
 </section>
 {% endblock %}
