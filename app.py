@@ -898,7 +898,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
     wb = Workbook()
     ws = wb.active
     ws.title = "Ойлик ҳисобот"
-    ws.append([f"SIM-карта сотувлари бўйича бонус ҳисоботи — {month}"])
+    ws.append([f"I-MAX — SIM-карта сотувлари бўйича бонус ҳисоботи — {month}"])
     ws.merge_cells("A1:E1")
     ws["A1"].font = Font(size=14, bold=True)
     ws["A1"].alignment = Alignment(horizontal="center")
@@ -925,7 +925,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
         cell.font = Font(bold=True)
 
     ws2 = wb.create_sheet("Ходимлар бўйича жами")
-    ws2.append([f"Ходимлар бўйича умумий натижа — {month}"])
+    ws2.append([f"I-MAX — ходимлар бўйича умумий натижа — {month}"])
     ws2.merge_cells("A1:C1")
     ws2["A1"].font = Font(size=14, bold=True)
     ws2["A1"].alignment = Alignment(horizontal="center")
