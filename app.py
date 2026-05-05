@@ -495,7 +495,7 @@ def create_app() -> Flask:
             existing = fetch_one(conn, "SELECT month FROM month_locks WHERE month = :month", {"month": month})
             if not existing:
                 conn.execute(
-                    text("INSERT INTO month_locks(month, closed_by) VALUES(:month, :closed_by)"),
+                    text("INSERT INTO month_locks(month, closed_by, closed_at) VALUES(:month, :closed_by, CURRENT_TIMESTAMP)"),
                     {"month": month, "closed_by": session.get("username", "admin")},
                 )
                 add_audit(conn, "Ой ёпилди", month)
@@ -608,15 +608,36 @@ def init_db() -> None:
         # Шунинг учун керакли устунларни хавфсиз тарзда қўшиб чиқамиз.
         ensure_schema_compatibility(conn)
 
-        user_count = scalar(conn, "SELECT COUNT(*) FROM users")
-        if user_count == 0:
+        # Эски база қайта ишлатилганда users жадвалида бошқа фойдаланувчилар бўлиши мумкин.
+        # Шунинг учун admin бор-йўқлигини умумий user_count билан эмас, username орқали текширамиз.
+        admin_user = fetch_one(conn, "SELECT id, password_hash FROM users WHERE username = :username", {"username": "admin"})
+        if not admin_user:
             conn.execute(
                 text("INSERT INTO users(username, password_hash) VALUES(:username, :password_hash)"),
                 {"username": "admin", "password_hash": generate_password_hash("admin123")},
             )
             conn.execute(
-                text("INSERT INTO audit_logs(action, details, username) VALUES(:action, :details, :username)"),
+                text(
+                    """
+                    INSERT INTO audit_logs(action, details, username, created_at)
+                    VALUES(:action, :details, :username, CURRENT_TIMESTAMP)
+                    """
+                ),
                 {"action": "Тизим яратилди", "details": "Биринчи admin фойдаланувчи қўшилди", "username": "system"},
+            )
+        elif not admin_user["password_hash"]:
+            conn.execute(
+                text("UPDATE users SET password_hash = :password_hash WHERE username = :username"),
+                {"username": "admin", "password_hash": generate_password_hash("admin123")},
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO audit_logs(action, details, username, created_at)
+                    VALUES(:action, :details, :username, CURRENT_TIMESTAMP)
+                    """
+                ),
+                {"action": "Admin пароль тикланди", "details": "admin123 вақтинча пароль ўрнатилди", "username": "system"},
             )
 
 
@@ -668,11 +689,13 @@ def ensure_schema_compatibility(conn) -> None:
         return
 
     # SQLite учун: ALTER TABLE ... ADD COLUMN IF NOT EXISTS ҳамма муҳитда ишламаслиги мумкин.
+    # Бундан ташқари SQLite мавжуд жадвалга CURRENT_TIMESTAMP default билан устун қўшишга рухсат бермаслиги мумкин.
     for table, columns in columns_by_table.items():
         existing = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
         for column, column_type in columns.items():
             if column not in existing:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
+                safe_column_type = column_type.replace(" DEFAULT CURRENT_TIMESTAMP", "")
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {safe_column_type}"))
 
 
 
@@ -861,7 +884,12 @@ def is_month_closed(month: str) -> bool:
 def add_audit(conn, action: str, details: str) -> None:
     username = session.get("username", "admin") if session else "admin"
     conn.execute(
-        text("INSERT INTO audit_logs(action, details, username) VALUES(:action, :details, :username)"),
+        text(
+            """
+            INSERT INTO audit_logs(action, details, username, created_at)
+            VALUES(:action, :details, :username, CURRENT_TIMESTAMP)
+            """
+        ),
         {"action": action, "details": details, "username": username},
     )
 
