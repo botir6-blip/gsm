@@ -155,7 +155,7 @@ def sale_new_safe():
         flash("Сақлаш учун мос тариф топилмади.", "warning")
         return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
 
-    employees_list, tariffs_list = core.get_active_refs()
+    employees_list, tariffs_list = core.get_active_refs(positive_tariffs_only=True)
     selected_date = request.args.get("sale_date", "").strip() or datetime.today().date().isoformat()
     selected_employee_id = core.parse_int(request.args.get("employee_id"))
     return render_template(

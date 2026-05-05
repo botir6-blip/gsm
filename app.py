@@ -359,7 +359,7 @@ def create_app() -> Flask:
             flash("Сақлаш учун мос тариф топилмади.", "warning")
             return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
 
-        employees_list, tariffs_list = get_active_refs()
+        employees_list, tariffs_list = get_active_refs(positive_tariffs_only=True)
         selected_date = request.args.get("sale_date", "").strip() or date.today().isoformat()
         selected_employee_id = parse_int(request.args.get("employee_id"))
         return render_template(
@@ -910,7 +910,10 @@ def save_daily_sales(
         if not employee:
             return 0, 0
 
-        tariff_rows = fetch_all(conn, "SELECT id, name FROM tariffs WHERE is_active = 1 ORDER BY name")
+        tariff_rows = fetch_all(
+            conn,
+            "SELECT id, name FROM tariffs WHERE is_active = 1 AND COALESCE(bonus_per_item, 0) > 0 ORDER BY name",
+        )
         active_tariffs = {int(row["id"]): row["name"] for row in tariff_rows}
 
         for tariff_id, quantity in quantities.items():
@@ -971,19 +974,26 @@ def save_daily_sales(
     return inserted, updated
 
 
-def get_active_refs(include_ids: tuple[int, int] | None = None) -> tuple[list[Any], list[Any]]:
+def get_active_refs(
+    include_ids: tuple[int, int] | None = None,
+    positive_tariffs_only: bool = False,
+) -> tuple[list[Any], list[Any]]:
     include_employee_id, include_tariff_id = include_ids or (0, 0)
+    if positive_tariffs_only:
+        tariff_sql = """
+            SELECT * FROM tariffs
+            WHERE (is_active = 1 AND COALESCE(bonus_per_item, 0) > 0) OR id = :id
+            ORDER BY name
+        """
+    else:
+        tariff_sql = "SELECT * FROM tariffs WHERE is_active = 1 OR id = :id ORDER BY name"
     with engine.connect() as conn:
         employees = fetch_all(
             conn,
             "SELECT * FROM employees WHERE is_active = 1 OR id = :id ORDER BY full_name",
             {"id": include_employee_id},
         )
-        tariffs = fetch_all(
-            conn,
-            "SELECT * FROM tariffs WHERE is_active = 1 OR id = :id ORDER BY name",
-            {"id": include_tariff_id},
-        )
+        tariffs = fetch_all(conn, tariff_sql, {"id": include_tariff_id})
     return employees, tariffs
 
 
