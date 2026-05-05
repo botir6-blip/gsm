@@ -349,3 +349,34 @@ label { display: flex; flex-direction: column; gap: 6px; color: #334155; font-we
     .login-showcase h1 { font-size: 30px; }
     .login-card { padding: 20px; }
 }
+
+.daily-sale-panel { max-width: 980px; }
+.daily-sale-form { display: flex; flex-direction: column; gap: 14px; }
+.daily-head-grid { margin-bottom: 0; }
+.daily-hint { margin: 0; line-height: 1.45; }
+.tariff-entry-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.tariff-entry-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 170px;
+    gap: 14px;
+    align-items: center;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: rgba(248, 250, 252, .82);
+}
+.tariff-entry-row:hover { background: #fff; border-color: #fecdd3; }
+.tariff-entry-name { font-weight: 800; color: var(--text); }
+.tariff-entry-bonus { margin-top: 4px; font-size: 13px; color: var(--muted); font-weight: 700; }
+.tariff-entry-qty { font-size: 13px; }
+.tariff-entry-qty input { text-align: right; font-weight: 800; font-size: 18px; }
+.daily-actions { margin-top: 2px; }
+
+@media (max-width: 650px) {
+    .tariff-entry-row { grid-template-columns: 1fr; }
+    .tariff-entry-qty input { text-align: left; }
+}
