@@ -24,7 +24,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -200,16 +200,31 @@ def create_app() -> Flask:
         if not full_name:
             flash("Ходим Ф.И.О. киритилмаган.", "danger")
             return redirect(url_for("employees"))
-        with engine.begin() as conn:
-            try:
-                conn.execute(
-                    text("INSERT INTO employees(full_name, is_active) VALUES(:full_name, 1)"),
+        try:
+            with engine.begin() as conn:
+                existing = fetch_one(
+                    conn,
+                    "SELECT id FROM employees WHERE lower(trim(full_name)) = lower(trim(:full_name))",
                     {"full_name": full_name},
                 )
+                if existing:
+                    flash("Бу Ф.И.О. аллақачон бор.", "warning")
+                    return redirect(url_for("employees"))
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO employees(id, full_name, is_active, created_at)
+                        VALUES(:id, :full_name, 1, :created_at)
+                        """
+                    ),
+                    {"id": next_id(conn, "employees"), "full_name": full_name, "created_at": current_timestamp()},
+                )
                 add_audit(conn, "Ходим қўшилди", full_name)
-                flash("Ходим қўшилди.", "success")
-            except IntegrityError:
-                flash("Бу Ф.И.О. аллақачон бор.", "warning")
+            flash("Ходим қўшилди.", "success")
+        except IntegrityError as exc:
+            flash(integrity_message(exc, "Бу Ф.И.О. аллақачон бор."), "warning")
+        except SQLAlchemyError as exc:
+            flash(f"Ходим қўшишда база хатоси: {db_error_text(exc)}", "danger")
         return redirect(url_for("employees"))
 
     @app.route("/employees/<int:employee_id>/edit", methods=["POST"])
@@ -250,16 +265,31 @@ def create_app() -> Flask:
         if bonus < 0:
             flash("Бонус суммаси манфий бўлмаслиги керак.", "danger")
             return redirect(url_for("tariffs"))
-        with engine.begin() as conn:
-            try:
+        try:
+            with engine.begin() as conn:
+                existing = fetch_one(
+                    conn,
+                    "SELECT id FROM tariffs WHERE lower(trim(name)) = lower(trim(:name))",
+                    {"name": name},
+                )
+                if existing:
+                    flash("Бу тариф аллақачон бор.", "warning")
+                    return redirect(url_for("tariffs"))
                 conn.execute(
-                    text("INSERT INTO tariffs(name, bonus_per_item, is_active) VALUES(:name, :bonus, 1)"),
-                    {"name": name, "bonus": bonus},
+                    text(
+                        """
+                        INSERT INTO tariffs(id, name, bonus_per_item, is_active, created_at)
+                        VALUES(:id, :name, :bonus, 1, :created_at)
+                        """
+                    ),
+                    {"id": next_id(conn, "tariffs"), "name": name, "bonus": bonus, "created_at": current_timestamp()},
                 )
                 add_audit(conn, "Тариф қўшилди", f"{name}; бонус={bonus}")
-                flash("Тариф қўшилди.", "success")
-            except IntegrityError:
-                flash("Бу тариф аллақачон бор.", "warning")
+            flash("Тариф қўшилди.", "success")
+        except IntegrityError as exc:
+            flash(integrity_message(exc, "Бу тариф аллақачон бор."), "warning")
+        except SQLAlchemyError as exc:
+            flash(f"Тариф қўшишда база хатоси: {db_error_text(exc)}", "danger")
         return redirect(url_for("tariffs"))
 
     @app.route("/tariffs/<int:tariff_id>/edit", methods=["POST"])
@@ -326,17 +356,19 @@ def create_app() -> Flask:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO sales(sale_date, employee_id, tariff_id, quantity, comment, created_by)
-                        VALUES(:sale_date, :employee_id, :tariff_id, :quantity, :comment, :created_by)
+                        INSERT INTO sales(id, sale_date, employee_id, tariff_id, quantity, comment, created_by, created_at)
+                        VALUES(:id, :sale_date, :employee_id, :tariff_id, :quantity, :comment, :created_by, :created_at)
                         """
                     ),
                     {
+                        "id": next_id(conn, "sales"),
                         "sale_date": sale_date,
                         "employee_id": employee_id,
                         "tariff_id": tariff_id,
                         "quantity": quantity,
                         "comment": comment,
                         "created_by": session.get("username", "admin"),
+                        "created_at": current_timestamp(),
                     },
                 )
                 add_audit(conn, "Сотув қўшилди", f"{sale_date}, employee_id={employee_id}, tariff_id={tariff_id}, quantity={quantity}")
@@ -538,6 +570,38 @@ def scalar(conn, sql: str, params: dict[str, Any] | None = None) -> Any:
     return conn.execute(text(sql), params or {}).scalar() or 0
 
 
+ALLOWED_ID_TABLES = {"users", "employees", "tariffs", "sales", "audit_logs"}
+
+
+def current_timestamp() -> datetime:
+    """Use an explicit timestamp so old Railway DB tables do not need DEFAULT created_at."""
+    return datetime.now().replace(microsecond=0)
+
+
+def next_id(conn, table_name: str) -> int:
+    """Generate a safe id even if an old Postgres table has no identity/serial default."""
+    if table_name not in ALLOWED_ID_TABLES:
+        raise ValueError(f"Unsupported table name for next_id: {table_name}")
+    return int(conn.execute(text(f"SELECT COALESCE(MAX(id), 0) + 1 FROM {table_name}")).scalar() or 1)
+
+
+def db_error_text(exc: Exception) -> str:
+    message = str(getattr(exc, "orig", exc)).replace("\n", " ").strip()
+    return message[:450] if message else exc.__class__.__name__
+
+
+def is_unique_error(exc: Exception) -> bool:
+    message = db_error_text(exc).lower()
+    unique_markers = ("unique", "duplicate key", "already exists", "уник", "takror")
+    return any(marker in message for marker in unique_markers)
+
+
+def integrity_message(exc: Exception, duplicate_message: str) -> str:
+    if is_unique_error(exc):
+        return duplicate_message
+    return f"База структурасида хато: {db_error_text(exc)}"
+
+
 def init_db() -> None:
     dialect = engine.dialect.name
     if dialect == "postgresql":
@@ -613,17 +677,33 @@ def init_db() -> None:
         admin_user = fetch_one(conn, "SELECT id, password_hash FROM users WHERE username = :username", {"username": "admin"})
         if not admin_user:
             conn.execute(
-                text("INSERT INTO users(username, password_hash) VALUES(:username, :password_hash)"),
-                {"username": "admin", "password_hash": generate_password_hash("admin123")},
+                text(
+                    """
+                    INSERT INTO users(id, username, password_hash, created_at)
+                    VALUES(:id, :username, :password_hash, :created_at)
+                    """
+                ),
+                {
+                    "id": next_id(conn, "users"),
+                    "username": "admin",
+                    "password_hash": generate_password_hash("admin123"),
+                    "created_at": current_timestamp(),
+                },
             )
             conn.execute(
                 text(
                     """
-                    INSERT INTO audit_logs(action, details, username, created_at)
-                    VALUES(:action, :details, :username, CURRENT_TIMESTAMP)
+                    INSERT INTO audit_logs(id, action, details, username, created_at)
+                    VALUES(:id, :action, :details, :username, :created_at)
                     """
                 ),
-                {"action": "Тизим яратилди", "details": "Биринчи admin фойдаланувчи қўшилди", "username": "system"},
+                {
+                    "id": next_id(conn, "audit_logs"),
+                    "action": "Тизим яратилди",
+                    "details": "Биринчи admin фойдаланувчи қўшилди",
+                    "username": "system",
+                    "created_at": current_timestamp(),
+                },
             )
         elif not admin_user["password_hash"]:
             conn.execute(
@@ -633,11 +713,17 @@ def init_db() -> None:
             conn.execute(
                 text(
                     """
-                    INSERT INTO audit_logs(action, details, username, created_at)
-                    VALUES(:action, :details, :username, CURRENT_TIMESTAMP)
+                    INSERT INTO audit_logs(id, action, details, username, created_at)
+                    VALUES(:id, :action, :details, :username, :created_at)
                     """
                 ),
-                {"action": "Admin пароль тикланди", "details": "admin123 вақтинча пароль ўрнатилди", "username": "system"},
+                {
+                    "id": next_id(conn, "audit_logs"),
+                    "action": "Admin пароль тикланди",
+                    "details": "admin123 вақтинча пароль ўрнатилди",
+                    "username": "system",
+                    "created_at": current_timestamp(),
+                },
             )
 
 
@@ -686,6 +772,18 @@ def ensure_schema_compatibility(conn) -> None:
         for table, columns in columns_by_table.items():
             for column, column_type in columns.items():
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {column_type}"))
+
+        postgres_defaults = {
+            "users": {"created_at": "CURRENT_TIMESTAMP"},
+            "employees": {"is_active": "1", "created_at": "CURRENT_TIMESTAMP"},
+            "tariffs": {"bonus_per_item": "0", "is_active": "1", "created_at": "CURRENT_TIMESTAMP"},
+            "sales": {"quantity": "0", "created_at": "CURRENT_TIMESTAMP"},
+            "month_locks": {"closed_at": "CURRENT_TIMESTAMP"},
+            "audit_logs": {"created_at": "CURRENT_TIMESTAMP"},
+        }
+        for table, columns in postgres_defaults.items():
+            for column, default_expr in columns.items():
+                conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT {default_expr}"))
         return
 
     # SQLite учун: ALTER TABLE ... ADD COLUMN IF NOT EXISTS ҳамма муҳитда ишламаслиги мумкин.
@@ -886,11 +984,17 @@ def add_audit(conn, action: str, details: str) -> None:
     conn.execute(
         text(
             """
-            INSERT INTO audit_logs(action, details, username, created_at)
-            VALUES(:action, :details, :username, CURRENT_TIMESTAMP)
+            INSERT INTO audit_logs(id, action, details, username, created_at)
+            VALUES(:id, :action, :details, :username, :created_at)
             """
         ),
-        {"action": action, "details": details, "username": username},
+        {
+            "id": next_id(conn, "audit_logs"),
+            "action": action,
+            "details": details,
+            "username": username,
+            "created_at": current_timestamp(),
+        },
     )
 
 
