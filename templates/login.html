@@ -4,7 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Кириш — SIM Бонус</title>
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="SIM Бонус">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script defer src="{{ url_for('static', filename='app_install.js') }}"></script>
 </head>
 <body class="login-body">
 <div class="login-card">
@@ -32,6 +40,7 @@
             <input type="password" name="password" autocomplete="current-password" required>
         </label>
         <button type="submit" class="btn primary full">Кириш</button>
+        <button type="button" id="installAppButton" class="btn full install-app-button" hidden>Телефон/компьютерга илова қилиб ўрнатиш</button>
     </form>
     <p class="muted small">Биринчи кириш: <b>admin</b> / <b>admin123</b>. Кейин паролни алмаштиринг.</p>
 </div>

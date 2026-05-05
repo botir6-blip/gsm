@@ -4,7 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}SIM Бонус Ҳисоб{% endblock %}</title>
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="SIM Бонус">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script defer src="{{ url_for('static', filename='app_install.js') }}"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -34,7 +42,10 @@
                 <h1>{% block header %}SIM Бонус Ҳисоб{% endblock %}</h1>
                 <p>{% block subheader %}Ходим Ф.И.О., тариф ва сотув сони бўйича бонус ҳисоблаш дастури{% endblock %}</p>
             </div>
-            <div class="user-pill">{{ session.get('username', 'admin') }}</div>
+            <div class="topbar-actions">
+                <button type="button" id="installAppButton" class="btn small install-app-button" hidden>Илова сифатида ўрнатиш</button>
+                <div class="user-pill">{{ session.get('username', 'admin') }}</div>
+            </div>
         </header>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
