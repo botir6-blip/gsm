@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="uz">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}SIM Бонус Ҳисоб{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-mark">SIM</div>
+            <div>
+                <div class="brand-title">SIM Бонус</div>
+                <div class="brand-subtitle">Сотув ҳисоботи</div>
+            </div>
+        </div>
+        <nav class="nav">
+            <a class="nav-link {{ 'active' if active == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Бош саҳифа</a>
+            <a class="nav-link {{ 'active' if active == 'employees' else '' }}" href="{{ url_for('employees') }}">Ходимлар</a>
+            <a class="nav-link {{ 'active' if active == 'tariffs' else '' }}" href="{{ url_for('tariffs') }}">Тарифлар</a>
+            <a class="nav-link {{ 'active' if active == 'sale_new' else '' }}" href="{{ url_for('sale_new') }}">Кунлик сотув киритиш</a>
+            <a class="nav-link {{ 'active' if active == 'sales_journal' else '' }}" href="{{ url_for('sales_journal') }}">Сотувлар журнали</a>
+            <a class="nav-link {{ 'active' if active == 'report' else '' }}" href="{{ url_for('report') }}">Ойлик ҳисобот</a>
+            <a class="nav-link {{ 'active' if active == 'audit' else '' }}" href="{{ url_for('audit') }}">Ўзгаришлар журнали</a>
+            <a class="nav-link {{ 'active' if active == 'password' else '' }}" href="{{ url_for('change_password') }}">Паролни ўзгартириш</a>
+            <a class="nav-link danger" href="{{ url_for('logout') }}">Чиқиш</a>
+        </nav>
+    </aside>
+    <main class="content">
+        <header class="topbar">
+            <div>
+                <h1>{% block header %}SIM Бонус Ҳисоб{% endblock %}</h1>
+                <p>{% block subheader %}Ходим Ф.И.О., тариф ва сотув сони бўйича бонус ҳисоблаш дастури{% endblock %}</p>
+            </div>
+            <div class="user-pill">{{ session.get('username', 'admin') }}</div>
+        </header>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                    {% for category, message in messages %}
+                        <div class="alert {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

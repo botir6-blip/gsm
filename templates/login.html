@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="uz">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Кириш — SIM Бонус</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-body">
+<div class="login-card">
+    <div class="brand login-brand">
+        <div class="brand-mark">SIM</div>
+        <div>
+            <div class="brand-title">SIM Бонус</div>
+            <div class="brand-subtitle">Кириш ойнаси</div>
+        </div>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="messages">
+                {% for category, message in messages %}
+                    <div class="alert {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    <form method="post" class="form-stack">
+        <label>Логин
+            <input type="text" name="username" value="admin" autocomplete="username" required>
+        </label>
+        <label>Пароль
+            <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="btn primary full">Кириш</button>
+    </form>
+    <p class="muted small">Биринчи кириш: <b>admin</b> / <b>admin123</b>. Кейин паролни алмаштиринг.</p>
+</div>
+</body>
+</html>

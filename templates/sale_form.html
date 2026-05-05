@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{% if sale %}Сотувни ўзгартириш{% else %}Кунлик сотув киритиш{% endif %}{% endblock %}
+{% block header %}{% if sale %}Сотувни ўзгартириш{% else %}Кунлик сотув киритиш{% endif %}{% endblock %}
+{% block content %}
+<section class="panel narrow">
+    <div class="panel-title">{% if sale %}Маълумотни таҳрирлаш{% else %}Янги сотув{% endif %}</div>
+    {% if not employees or not tariffs %}
+        <div class="alert warning">Аввал ходим ва тариф киритинг.</div>
+    {% endif %}
+    <form method="post" class="form-grid">
+        <label>Сана
+            <input type="date" name="sale_date" value="{{ sale.sale_date if sale else today }}" required>
+        </label>
+        <label>Ходим Ф.И.О.
+            <select name="employee_id" required>
+                <option value="">Танланг...</option>
+                {% for emp in employees %}
+                    <option value="{{ emp.id }}" {% if sale and sale.employee_id == emp.id %}selected{% endif %}>{{ emp.full_name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Тариф номи
+            <select name="tariff_id" required>
+                <option value="">Танланг...</option>
+                {% for tariff in tariffs %}
+                    <option value="{{ tariff.id }}" {% if sale and sale.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name }} — {{ tariff.bonus_per_item|money }} сўм</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Сотилган SIM-карта сони
+            <input type="number" name="quantity" value="{{ sale.quantity if sale else '' }}" min="1" required>
+        </label>
+        <label class="span-2">Изоҳ
+            <input type="text" name="comment" value="{{ sale.comment if sale and sale.comment else '' }}" placeholder="Ихтиёрий">
+        </label>
+        {% if sale %}
+        <label class="span-2">Ўзгартириш сабаби <span class="required">*</span>
+            <input type="text" name="reason" required placeholder="Масалан: сотув сони нотўғри киритилган">
+        </label>
+        {% endif %}
+        <div class="actions span-2">
+            <button type="submit" class="btn primary">Сақлаш</button>
+            <a href="{{ url_for('sales_journal') }}" class="btn ghost">Журналга ўтиш</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

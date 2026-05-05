@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Ўзгаришлар журнали{% endblock %}
+{% block header %}Ўзгаришлар журнали{% endblock %}
+{% block content %}
+<section class="panel">
+    <div class="panel-title">Охирги 200 та ўзгариш</div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Вақт</th><th>Фойдаланувчи</th><th>Амал</th><th>Тафсилот</th></tr></thead>
+            <tbody>
+            {% for row in rows %}
+            <tr><td>{{ row.created_at }}</td><td>{{ row.username }}</td><td>{{ row.action }}</td><td>{{ row.details }}</td></tr>
+            {% else %}
+            <tr><td colspan="4" class="empty">Ҳали ўзгариш йўқ</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

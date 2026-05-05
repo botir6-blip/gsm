@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Ойлик ҳисобот{% endblock %}
+{% block header %}Ойлик ҳисобот{% endblock %}
+{% block content %}
+<section class="panel">
+    <div class="panel-title">Ой танлаш</div>
+    <form method="get" class="toolbar">
+        <label>Ой
+            <input type="month" name="month" value="{{ month }}">
+        </label>
+        <button class="btn" type="submit">Кўрсатиш</button>
+        <a class="btn primary" href="{{ url_for('report_export', month=month) }}">Excel’га юклаш</a>
+    </form>
+    <div class="month-status">
+        {% if closed %}
+            <span class="badge locked">Ой ёпилган</span>
+            <form method="post" action="{{ url_for('month_open') }}" class="mini-form">
+                <input type="hidden" name="month" value="{{ month }}">
+                <input type="text" name="reason" placeholder="Қайта очиш сабаби" required>
+                <button class="btn small" type="submit">Ойни қайта очиш</button>
+            </form>
+        {% else %}
+            <span class="badge open">Ой очиқ</span>
+            <form method="post" action="{{ url_for('month_close') }}" class="mini-form">
+                <input type="hidden" name="month" value="{{ month }}">
+                <button class="btn small danger-btn" type="submit" onclick="return confirm('Ой ёпилса, маълумотлар ўзгартирилмайди. Давом этасизми?')">Ойни ёпиш</button>
+            </form>
+        {% endif %}
+    </div>
+</section>
+
+<div class="cards-grid">
+    <div class="stat-card">
+        <div class="stat-label">Жами SIM</div>
+        <div class="stat-value">{{ totals.total_qty|qty }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Жами бонус</div>
+        <div class="stat-value">{{ totals.total_bonus|money }} сўм</div>
+    </div>
+</div>
+
+<section class="panel">
+    <div class="panel-title">Тарифлар кесимида ҳисобот</div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Ходим Ф.И.О.</th><th>Тариф номи</th><th>Сони</th><th>1 дона бонус</th><th>Жами бонус</th></tr></thead>
+            <tbody>
+            {% for row in detail %}
+            <tr>
+                <td>{{ row.full_name }}</td>
+                <td>{{ row.tariff_name }}</td>
+                <td class="num">{{ row.total_qty|qty }}</td>
+                <td class="num">{{ row.bonus_per_item|money }}</td>
+                <td class="num strong">{{ row.total_bonus|money }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="empty">Бу ой учун маълумот йўқ</td></tr>
+            {% endfor %}
+            </tbody>
+            <tfoot><tr><th colspan="2">ЖАМИ</th><th class="num">{{ totals.total_qty|qty }}</th><th></th><th class="num">{{ totals.total_bonus|money }}</th></tr></tfoot>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-title">Ходимлар бўйича жами</div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Ходим Ф.И.О.</th><th>Жами SIM</th><th>Жами бонус</th></tr></thead>
+            <tbody>
+            {% for row in summary %}
+            <tr><td>{{ row.full_name }}</td><td class="num">{{ row.total_qty|qty }}</td><td class="num strong">{{ row.total_bonus|money }}</td></tr>
+            {% else %}
+            <tr><td colspan="3" class="empty">Маълумот йўқ</td></tr>
+            {% endfor %}
+            </tbody>
+            <tfoot><tr><th>ЖАМИ</th><th class="num">{{ totals.total_qty|qty }}</th><th class="num">{{ totals.total_bonus|money }}</th></tr></tfoot>
+        </table>
+    </div>
+</section>
+{% endblock %}

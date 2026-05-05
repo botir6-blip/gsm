@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Сотувлар журнали{% endblock %}
+{% block header %}Сотувлар журнали{% endblock %}
+{% block content %}
+<section class="panel">
+    <div class="panel-title">Фильтрлар</div>
+    <form method="get" class="filters">
+        <label>Санадан
+            <input type="date" name="date_from" value="{{ filters.date_from }}">
+        </label>
+        <label>Санагача
+            <input type="date" name="date_to" value="{{ filters.date_to }}">
+        </label>
+        <label>Ходим
+            <select name="employee_id">
+                <option value="0">Ҳаммаси</option>
+                {% for emp in employees %}
+                    <option value="{{ emp.id }}" {% if filters.employee_id == emp.id %}selected{% endif %}>{{ emp.full_name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Тариф
+            <select name="tariff_id">
+                <option value="0">Ҳаммаси</option>
+                {% for tariff in tariffs %}
+                    <option value="{{ tariff.id }}" {% if filters.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Қидириш
+            <input type="text" name="q" value="{{ filters.q }}" placeholder="Ф.И.О., тариф, изоҳ">
+        </label>
+        <div class="filter-actions">
+            <button class="btn" type="submit">Кўрсатиш</button>
+            <a class="btn ghost" href="{{ url_for('sales_journal') }}">Тозалаш</a>
+        </div>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <div class="panel-title">Журнал</div>
+        <a href="{{ url_for('sale_new') }}" class="btn primary small">+ Янги сотув</a>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th>Сана</th><th>Ходим Ф.И.О.</th><th>Тариф</th><th>Сони</th><th>1 дона бонус</th><th>Жами бонус</th><th>Изоҳ</th><th>Амал</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.sale_date }}</td>
+                <td>{{ row.full_name }}</td>
+                <td>{{ row.tariff_name }}</td>
+                <td class="num">{{ row.quantity|qty }}</td>
+                <td class="num">{{ row.bonus_per_item|money }}</td>
+                <td class="num strong">{{ row.bonus_total|money }}</td>
+                <td>{{ row.comment or '' }}</td>
+                <td class="row-actions">
+                    <a class="btn small" href="{{ url_for('sale_edit', sale_id=row.id) }}">Ўзгартириш</a>
+                    <form method="post" action="{{ url_for('sale_delete', sale_id=row.id) }}" onsubmit="return confirm('Ҳақиқатан ўчирмоқчимисиз?')">
+                        <input type="text" name="reason" placeholder="Ўчириш сабаби" required>
+                        <button class="btn small danger-btn" type="submit">Ўчириш</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="empty">Маълумот топилмади</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
