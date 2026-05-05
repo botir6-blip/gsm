@@ -71,14 +71,13 @@
             <div class="tariff-entry-row">
                 <div class="tariff-entry-info">
                     <div class="tariff-entry-name">{{ tariff.name|tariff_name }}</div>
-                    <div class="tariff-entry-bonus">1 дона бонус: {{ tariff.bonus_per_item|money }} сўм</div>
                 </div>
                 <label class="tariff-entry-qty">Сони
                     <input type="number" name="quantity_{{ tariff.id }}" min="0" step="1" inputmode="numeric" placeholder="0">
                 </label>
             </div>
             {% else %}
-            <div class="empty">Тарифлар рўйхати бўш</div>
+            <div class="empty">Киритиш учун актив тариф топилмади. Тариф қиймати 0 дан катта бўлса, шу рўйхатда чиқади.</div>
             {% endfor %}
         </div>
 
