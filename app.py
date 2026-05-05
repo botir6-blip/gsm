@@ -329,61 +329,47 @@ def create_app() -> Flask:
         if request.method == "POST":
             sale_date = request.form.get("sale_date", "").strip()
             employee_id = parse_int(request.form.get("employee_id"))
-            tariff_id = parse_int(request.form.get("tariff_id"))
-            quantity = parse_int(request.form.get("quantity"))
             comment = request.form.get("comment", "").strip()
+            quantities, has_negative = collect_tariff_quantities(request.form)
 
-            error = validate_sale_form(sale_date, employee_id, tariff_id, quantity)
+            error = validate_daily_sale_form(sale_date, employee_id, quantities, has_negative)
             if error:
                 flash(error, "danger")
-                return redirect(url_for("sale_new"))
-            month = sale_date[:7]
-            if is_month_closed(month):
+                return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
+            if is_month_closed(sale_date[:7]):
                 flash("Бу ой ёпилган. Маълумот киритиш ёки ўзгартириш мумкин эмас.", "danger")
-                return redirect(url_for("sale_new"))
+                return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
 
-            with engine.begin() as conn:
-                duplicate = fetch_one(
-                    conn,
-                    """
-                    SELECT id FROM sales
-                    WHERE sale_date = :sale_date AND employee_id = :employee_id AND tariff_id = :tariff_id
-                    """,
-                    {"sale_date": sale_date, "employee_id": employee_id, "tariff_id": tariff_id},
-                )
-                if duplicate:
-                    flash("Бу санада ушбу ходим учун бу тариф аллақачон киритилган.", "warning")
-                    return redirect(url_for("sale_new"))
-                conn.execute(
-                    text(
-                        """
-                        INSERT INTO sales(id, sale_date, employee_id, tariff_id, quantity, comment, created_by, created_at)
-                        VALUES(:id, :sale_date, :employee_id, :tariff_id, :quantity, :comment, :created_by, :created_at)
-                        """
-                    ),
-                    {
-                        "id": next_id(conn, "sales"),
-                        "sale_date": sale_date,
-                        "employee_id": employee_id,
-                        "tariff_id": tariff_id,
-                        "quantity": quantity,
-                        "comment": comment,
-                        "created_by": session.get("username", "admin"),
-                        "created_at": current_timestamp(),
-                    },
-                )
-                add_audit(conn, "Сотув қўшилди", f"{sale_date}, employee_id={employee_id}, tariff_id={tariff_id}, quantity={quantity}")
-            flash("Сотув сақланди.", "success")
-            return redirect(url_for("sale_new"))
+            inserted, updated = save_daily_sales(
+                sale_date=sale_date,
+                employee_id=employee_id,
+                quantities=quantities,
+                comment=comment,
+                created_by=session.get("username", "admin"),
+            )
+            if inserted or updated:
+                parts = []
+                if inserted:
+                    parts.append(f"{inserted} та янги тариф")
+                if updated:
+                    parts.append(f"{updated} та аввал киритилган тариф янгиланди")
+                flash("Кунлик сотув сақланди: " + ", ".join(parts) + ".", "success")
+                return redirect(url_for("sale_new", sale_date=sale_date))
+
+            flash("Сақлаш учун мос тариф топилмади.", "warning")
+            return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
 
         employees_list, tariffs_list = get_active_refs()
+        selected_date = request.args.get("sale_date", "").strip() or date.today().isoformat()
+        selected_employee_id = parse_int(request.args.get("employee_id"))
         return render_template(
             "sale_form.html",
             active="sale_new",
             sale=None,
             employees=employees_list,
             tariffs=tariffs_list,
-            today=date.today().isoformat(),
+            today=selected_date,
+            selected_employee_id=selected_employee_id,
         )
 
     @app.route("/sales/<int:sale_id>/edit", methods=["GET", "POST"])
@@ -869,6 +855,120 @@ def validate_sale_form(sale_date: str, employee_id: int, tariff_id: int, quantit
     if quantity <= 0:
         return "Сотилган SIM-карта сони 0 дан катта бўлиши керак."
     return None
+
+
+def collect_tariff_quantities(form: Any) -> tuple[dict[int, int], bool]:
+    """Return tariff_id -> quantity from the convenient daily sales table."""
+    quantities: dict[int, int] = {}
+    has_negative = False
+    for key in form.keys():
+        key_text = str(key)
+        if not key_text.startswith("quantity_"):
+            continue
+        tariff_id = parse_int(key_text.replace("quantity_", "", 1))
+        quantity = parse_int(form.get(key_text))
+        if quantity < 0:
+            has_negative = True
+        elif tariff_id > 0 and quantity > 0:
+            quantities[tariff_id] = quantity
+    return quantities, has_negative
+
+
+def validate_daily_sale_form(
+    sale_date: str,
+    employee_id: int,
+    quantities: dict[int, int],
+    has_negative: bool = False,
+) -> str | None:
+    if not is_valid_date(sale_date):
+        return "Сана нотўғри киритилган."
+    if employee_id <= 0:
+        return "Ходим танланмаган."
+    if has_negative:
+        return "Сотилган SIM-карта сони манфий бўлмаслиги керак."
+    if not quantities:
+        return "Камида битта тариф бўйича сотилган сонини киритинг."
+    return None
+
+
+def save_daily_sales(
+    sale_date: str,
+    employee_id: int,
+    quantities: dict[int, int],
+    comment: str,
+    created_by: str,
+) -> tuple[int, int]:
+    """Insert/update one employee's daily sales for all entered tariffs."""
+    inserted = 0
+    updated = 0
+    with engine.begin() as conn:
+        employee = fetch_one(
+            conn,
+            "SELECT id FROM employees WHERE id = :id AND is_active = 1",
+            {"id": employee_id},
+        )
+        if not employee:
+            return 0, 0
+
+        tariff_rows = fetch_all(conn, "SELECT id, name FROM tariffs WHERE is_active = 1 ORDER BY name")
+        active_tariffs = {int(row["id"]): row["name"] for row in tariff_rows}
+
+        for tariff_id, quantity in quantities.items():
+            if tariff_id not in active_tariffs or quantity <= 0:
+                continue
+            existing = fetch_one(
+                conn,
+                """
+                SELECT id FROM sales
+                WHERE sale_date = :sale_date AND employee_id = :employee_id AND tariff_id = :tariff_id
+                """,
+                {"sale_date": sale_date, "employee_id": employee_id, "tariff_id": tariff_id},
+            )
+            if existing:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE sales
+                        SET quantity = :quantity,
+                            comment = :comment,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = :id
+                        """
+                    ),
+                    {"quantity": quantity, "comment": comment, "id": existing["id"]},
+                )
+                add_audit(
+                    conn,
+                    "Кунлик сотув янгиланди",
+                    f"{sale_date}, employee_id={employee_id}, tariff_id={tariff_id}, quantity={quantity}",
+                )
+                updated += 1
+            else:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO sales(id, sale_date, employee_id, tariff_id, quantity, comment, created_by, created_at)
+                        VALUES(:id, :sale_date, :employee_id, :tariff_id, :quantity, :comment, :created_by, :created_at)
+                        """
+                    ),
+                    {
+                        "id": next_id(conn, "sales"),
+                        "sale_date": sale_date,
+                        "employee_id": employee_id,
+                        "tariff_id": tariff_id,
+                        "quantity": quantity,
+                        "comment": comment,
+                        "created_by": created_by,
+                        "created_at": current_timestamp(),
+                    },
+                )
+                add_audit(
+                    conn,
+                    "Сотув қўшилди",
+                    f"{sale_date}, employee_id={employee_id}, tariff_id={tariff_id}, quantity={quantity}",
+                )
+                inserted += 1
+    return inserted, updated
 
 
 def get_active_refs(include_ids: tuple[int, int] | None = None) -> tuple[list[Any], list[Any]]:

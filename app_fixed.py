@@ -125,68 +125,48 @@ def sale_new_safe():
     if request.method == "POST":
         sale_date = request.form.get("sale_date", "").strip()
         employee_id = core.parse_int(request.form.get("employee_id"))
-        tariff_id = core.parse_int(request.form.get("tariff_id"))
-        quantity = core.parse_int(request.form.get("quantity"))
         comment = request.form.get("comment", "").strip()
+        quantities, has_negative = core.collect_tariff_quantities(request.form)
 
-        error = core.validate_sale_form(sale_date, employee_id, tariff_id, quantity)
+        error = core.validate_daily_sale_form(sale_date, employee_id, quantities, has_negative)
         if error:
             flash(error, "danger")
-            return redirect(url_for("sale_new"))
-        month = sale_date[:7]
-        if core.is_month_closed(month):
+            return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
+        if core.is_month_closed(sale_date[:7]):
             flash("Бу ой ёпилган. Маълумот киритиш ёки ўзгартириш мумкин эмас.", "danger")
-            return redirect(url_for("sale_new"))
+            return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
 
-        with core.engine.begin() as conn:
-            try:
-                duplicate = core.fetch_one(
-                    conn,
-                    """
-                    SELECT id FROM sales
-                    WHERE sale_date = :sale_date AND employee_id = :employee_id AND tariff_id = :tariff_id
-                    """,
-                    {"sale_date": sale_date, "employee_id": employee_id, "tariff_id": tariff_id},
-                )
-                if duplicate:
-                    flash("Бу санада ушбу ходим учун бу тариф аллақачон киритилган.", "warning")
-                    return redirect(url_for("sale_new"))
-                conn.execute(
-                    text(
-                        """
-                        INSERT INTO sales(id, sale_date, employee_id, tariff_id, quantity, comment, created_by, created_at)
-                        VALUES(:id, :sale_date, :employee_id, :tariff_id, :quantity, :comment, :created_by, :created_at)
-                        """
-                    ),
-                    {
-                        "id": next_id(conn, "sales"),
-                        "sale_date": sale_date,
-                        "employee_id": employee_id,
-                        "tariff_id": tariff_id,
-                        "quantity": quantity,
-                        "comment": comment,
-                        "created_by": session.get("username", "admin"),
-                        "created_at": now_db(),
-                    },
-                )
-                add_audit_safe(conn, "Сотув қўшилди", f"{sale_date}, employee_id={employee_id}, tariff_id={tariff_id}, quantity={quantity}")
-                flash("Сотув сақланди.", "success")
-            except IntegrityError as exc:
-                flash(f"Сотув қўшишда база хатоси: {db_error_text(exc)}", "danger")
-            except Exception as exc:
-                flash(f"Сотув қўшишда хато: {db_error_text(exc)}", "danger")
-        return redirect(url_for("sale_new"))
+        inserted, updated = core.save_daily_sales(
+            sale_date=sale_date,
+            employee_id=employee_id,
+            quantities=quantities,
+            comment=comment,
+            created_by=session.get("username", "admin"),
+        )
+        if inserted or updated:
+            parts = []
+            if inserted:
+                parts.append(f"{inserted} та янги тариф")
+            if updated:
+                parts.append(f"{updated} та аввал киритилган тариф янгиланди")
+            flash("Кунлик сотув сақланди: " + ", ".join(parts) + ".", "success")
+            return redirect(url_for("sale_new", sale_date=sale_date))
+
+        flash("Сақлаш учун мос тариф топилмади.", "warning")
+        return redirect(url_for("sale_new", sale_date=sale_date, employee_id=employee_id))
 
     employees_list, tariffs_list = core.get_active_refs()
+    selected_date = request.args.get("sale_date", "").strip() or datetime.today().date().isoformat()
+    selected_employee_id = core.parse_int(request.args.get("employee_id"))
     return render_template(
         "sale_form.html",
         active="sale_new",
         sale=None,
         employees=employees_list,
         tariffs=tariffs_list,
-        today=datetime.today().date().isoformat(),
+        today=selected_date,
+        selected_employee_id=selected_employee_id,
     )
-
 
 app.view_functions["add_employee"] = add_employee_safe
 app.view_functions["add_tariff"] = add_tariff_safe
