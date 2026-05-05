@@ -15,6 +15,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    send_from_directory,
     session,
     url_for,
 )
@@ -64,6 +65,12 @@ def create_app() -> Flask:
     @app.route("/health")
     def health() -> str:
         return "ok"
+
+    @app.route("/sw.js")
+    def service_worker() -> Response:
+        response = send_from_directory(app.static_folder, "sw.js", mimetype="application/javascript")
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
     @app.route("/")
     @login_required

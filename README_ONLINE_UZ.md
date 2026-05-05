@@ -74,3 +74,8 @@ python app.py
 ```text
 http://127.0.0.1:5000
 ```
+
+
+## Компьютер ва Android учун илова режими
+
+Бу версия PWA қилиб тайёрланган. Railway HTTPS доменини очгандан кейин Chrome/Edge орқали “Install app” ёки “Add to Home screen” қилиб компьютер ва Android телефонга илова иконкаси сифатида ўрнатиш мумкин. Батафсил: `README_APP_WINDOWS_ANDROID_UZ.md`.
