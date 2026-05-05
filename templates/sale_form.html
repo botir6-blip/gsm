@@ -23,7 +23,7 @@
             <select name="tariff_id" required>
                 <option value="">Танланг...</option>
                 {% for tariff in tariffs %}
-                    <option value="{{ tariff.id }}" {% if sale and sale.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name }} — {{ tariff.bonus_per_item|money }} сўм</option>
+                    <option value="{{ tariff.id }}" {% if sale and sale.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name|tariff_name }}</option>
                 {% endfor %}
             </select>
         </label>

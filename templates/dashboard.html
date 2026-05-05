@@ -5,7 +5,7 @@
 {% block content %}
 <section class="hero-banner panel">
     <div>
-        <div class="hero-eyebrow">I-MAX бренди</div>
+        <div class="hero-eyebrow">I-MAX</div>
         <h2>SIM бонусларни бошқариш маркази</h2>
         <p>Бу ерда кунлик киритилган маълумотлар, ойлик жами сотув ва бонус натижаларини бир жойда кўрасиз.</p>
     </div>
@@ -61,7 +61,7 @@
                 <thead><tr><th>Тариф номи</th><th>Сони</th></tr></thead>
                 <tbody>
                 {% for row in top_tariffs %}
-                    <tr><td>{{ row.name }}</td><td class="num">{{ row.qty|qty }}</td></tr>
+                    <tr><td>{{ row.name|tariff_name }}</td><td class="num">{{ row.qty|qty }}</td></tr>
                 {% else %}
                     <tr><td colspan="2" class="empty">Маълумот йўқ</td></tr>
                 {% endfor %}

@@ -49,7 +49,7 @@
             {% for row in detail %}
             <tr>
                 <td>{{ row.full_name }}</td>
-                <td>{{ row.tariff_name }}</td>
+                <td>{{ row.tariff_name|tariff_name }}</td>
                 <td class="num">{{ row.total_qty|qty }}</td>
                 <td class="num">{{ row.bonus_per_item|money }}</td>
                 <td class="num strong">{{ row.total_bonus|money }}</td>

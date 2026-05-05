@@ -21,7 +21,7 @@
             <tr>
                 <form method="post" action="{{ url_for('edit_tariff', tariff_id=row.id) }}">
                     <td>{{ loop.index }}</td>
-                    <td><input type="text" name="name" value="{{ row.name }}" required></td>
+                    <td><input type="text" name="name" value="{{ row.name|tariff_name }}" required></td>
                     <td><input type="number" name="bonus_per_item" value="{{ row.bonus_per_item }}" min="0" required></td>
                     <td class="center"><label class="check"><input type="checkbox" name="is_active" {% if row.is_active %}checked{% endif %}> Фаол</label></td>
                     <td><button class="btn small" type="submit">Сақлаш</button></td>

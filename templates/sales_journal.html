@@ -23,7 +23,7 @@
             <select name="tariff_id">
                 <option value="0">Ҳаммаси</option>
                 {% for tariff in tariffs %}
-                    <option value="{{ tariff.id }}" {% if filters.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name }}</option>
+                    <option value="{{ tariff.id }}" {% if filters.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name|tariff_name }}</option>
                 {% endfor %}
             </select>
         </label>
@@ -54,7 +54,7 @@
             <tr>
                 <td>{{ row.sale_date }}</td>
                 <td>{{ row.full_name }}</td>
-                <td>{{ row.tariff_name }}</td>
+                <td>{{ row.tariff_name|tariff_name }}</td>
                 <td class="num">{{ row.quantity|qty }}</td>
                 <td class="num">{{ row.bonus_per_item|money }}</td>
                 <td class="num strong">{{ row.bonus_total|money }}</td>
