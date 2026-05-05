@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from datetime import date, datetime
 from functools import wraps
@@ -257,7 +258,7 @@ def create_app() -> Flask:
     @app.route("/tariffs/add", methods=["POST"])
     @login_required
     def add_tariff() -> Response:
-        name = request.form.get("name", "").strip()
+        name = tariff_name_display(request.form.get("name", ""))
         bonus = parse_int(request.form.get("bonus_per_item"))
         if not name:
             flash("Тариф номи киритилмаган.", "danger")
@@ -295,7 +296,7 @@ def create_app() -> Flask:
     @app.route("/tariffs/<int:tariff_id>/edit", methods=["POST"])
     @login_required
     def edit_tariff(tariff_id: int) -> Response:
-        name = request.form.get("name", "").strip()
+        name = tariff_name_display(request.form.get("name", ""))
         bonus = parse_int(request.form.get("bonus_per_item"))
         is_active = 1 if request.form.get("is_active") == "on" else 0
         if not name:
@@ -830,6 +831,18 @@ def qty(value: Any) -> str:
         return "0"
 
 
+def tariff_name_display(value: Any) -> str:
+    """Тариф номида пул бирлиги ёзилган бўлса, экранда дона бирлигида кўрсатади."""
+    name = str(value or "").strip()
+    if not name:
+        return ""
+    name = re.sub(r"\s+", " ", name)
+    name = re.sub(r"(?iu)\b(сум|сўм|so['’‘`]?m|sum)\b\.?", "дона", name)
+    if re.fullmatch(r"\d+(?:[\s.,]\d+)*", name):
+        return f"{name} дона"
+    return name
+
+
 def is_valid_date(value: str) -> bool:
     try:
         datetime.strptime(value, "%Y-%m-%d")
@@ -1017,7 +1030,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
     for row in data["detail"]:
         ws.append([
             row["full_name"],
-            row["tariff_name"],
+            tariff_name_display(row["tariff_name"]),
             row["total_qty"],
             row["bonus_per_item"],
             row["total_bonus"],
@@ -1071,6 +1084,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
 app = create_app()
 app.jinja_env.filters["money"] = money
 app.jinja_env.filters["qty"] = qty
+app.jinja_env.filters["tariff_name"] = tariff_name_display
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))

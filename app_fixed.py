@@ -85,7 +85,7 @@ def add_employee_safe():
 
 
 def add_tariff_safe():
-    name = request.form.get("name", "").strip()
+    name = core.tariff_name_display(request.form.get("name", ""))
     bonus = core.parse_int(request.form.get("bonus_per_item"))
     if not name:
         flash("Тариф номи киритилмаган.", "danger")
