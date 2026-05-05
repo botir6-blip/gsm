@@ -3,11 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}SIM Бонус Ҳисоб{% endblock %}</title>
-    <meta name="theme-color" content="#0f172a">
+    <title>{% block title %}I-MAX | SIM Бонус{% endblock %}</title>
+    <meta name="theme-color" content="#101828">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SIM Бонус">
+    <meta name="apple-mobile-web-app-title" content="I-MAX">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
@@ -17,13 +17,14 @@
 <body>
 <div class="app-shell">
     <aside class="sidebar">
-        <div class="brand">
-            <div class="brand-mark">SIM</div>
+        <div class="brand brand-main">
+            <div class="brand-mark">I‑MAX</div>
             <div>
-                <div class="brand-title">SIM Бонус</div>
-                <div class="brand-subtitle">Сотув ҳисоботи</div>
+                <div class="brand-title">I-MAX</div>
+                <div class="brand-subtitle">SIM бонус назорати</div>
             </div>
         </div>
+        <div class="brand-chip">Корпоратив бошқарув панели</div>
         <nav class="nav">
             <a class="nav-link {{ 'active' if active == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Бош саҳифа</a>
             <a class="nav-link {{ 'active' if active == 'employees' else '' }}" href="{{ url_for('employees') }}">Ходимлар</a>
@@ -35,12 +36,17 @@
             <a class="nav-link {{ 'active' if active == 'password' else '' }}" href="{{ url_for('change_password') }}">Паролни ўзгартириш</a>
             <a class="nav-link danger" href="{{ url_for('logout') }}">Чиқиш</a>
         </nav>
+        <div class="sidebar-note">
+            <div class="sidebar-note-title">I-MAX</div>
+            <div class="sidebar-note-text">Тарифлар кесимида ходимлар натижасини назорат қилиш ва ойлик бонусни тез ҳисоблаш учун қулай интерфейс.</div>
+        </div>
     </aside>
     <main class="content">
-        <header class="topbar">
+        <header class="topbar topbar-panel">
             <div>
-                <h1>{% block header %}SIM Бонус Ҳисоб{% endblock %}</h1>
-                <p>{% block subheader %}Ходим Ф.И.О., тариф ва сотув сони бўйича бонус ҳисоблаш дастури{% endblock %}</p>
+                <div class="brand-line">I-MAX бренди</div>
+                <h1>{% block header %}I-MAX SIM Бонус{% endblock %}</h1>
+                <p>{% block subheader %}Тарифлар бўйича кунлик кирим ва ойлик бонус ҳисоботи{% endblock %}</p>
             </div>
             <div class="topbar-actions">
                 <button type="button" id="installAppButton" class="btn small install-app-button" hidden>Илова сифатида ўрнатиш</button>
@@ -57,6 +63,7 @@
             {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
+        <footer class="footer-note">© {{ current_year }} I-MAX — SIM тарифлар ва бонуслар ҳисоби</footer>
     </main>
 </div>
 </body>

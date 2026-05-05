@@ -1,24 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Бош саҳифа{% endblock %}
-{% block header %}Бош саҳифа{% endblock %}
+{% block title %}Бош саҳифа | I-MAX{% endblock %}
+{% block header %}I-MAX назорат панели{% endblock %}
+{% block subheader %}Кунлик сотув, ойлик натижа ва бонуслар ҳолати{% endblock %}
 {% block content %}
-<form method="get" class="toolbar">
-    <label>Ой
-        <input type="month" name="month" value="{{ month }}">
-    </label>
-    <button class="btn" type="submit">Кўрсатиш</button>
-</form>
+<section class="hero-banner panel">
+    <div>
+        <div class="hero-eyebrow">I-MAX бренди</div>
+        <h2>SIM бонусларни бошқариш маркази</h2>
+        <p>Бу ерда кунлик киритилган маълумотлар, ойлик жами сотув ва бонус натижаларини бир жойда кўрасиз.</p>
+    </div>
+    <form method="get" class="toolbar hero-toolbar">
+        <label>Ой
+            <input type="month" name="month" value="{{ month }}">
+        </label>
+        <button class="btn primary" type="submit">Кўрсатиш</button>
+    </form>
+</section>
 
 <div class="cards-grid">
-    <div class="stat-card">
+    <div class="stat-card accent-red">
         <div class="stat-label">Бугун сотилган SIM</div>
         <div class="stat-value">{{ total_today|qty }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-blue">
         <div class="stat-label">{{ month }} ойида жами SIM</div>
         <div class="stat-value">{{ total_month|qty }}</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card accent-gold">
         <div class="stat-label">{{ month }} ойида жами бонус</div>
         <div class="stat-value">{{ bonus_month|money }} сўм</div>
     </div>
@@ -26,7 +34,10 @@
 
 <div class="two-col">
     <section class="panel">
-        <div class="panel-title">Ходимлар бўйича ТОП</div>
+        <div class="panel-head">
+            <div class="panel-title">Ходимлар бўйича ТОП</div>
+            <span class="panel-tag">I-MAX</span>
+        </div>
         <div class="table-wrap">
             <table>
                 <thead><tr><th>Ходим Ф.И.О.</th><th>Сони</th><th>Бонус</th></tr></thead>
@@ -41,7 +52,10 @@
         </div>
     </section>
     <section class="panel">
-        <div class="panel-title">Тарифлар бўйича ТОП</div>
+        <div class="panel-head">
+            <div class="panel-title">Тарифлар бўйича ТОП</div>
+            <span class="panel-tag">I-MAX</span>
+        </div>
         <div class="table-wrap">
             <table>
                 <thead><tr><th>Тариф номи</th><th>Сони</th></tr></thead>

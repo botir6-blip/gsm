@@ -3,11 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Кириш — SIM Бонус</title>
-    <meta name="theme-color" content="#0f172a">
+    <title>Кириш — I-MAX</title>
+    <meta name="theme-color" content="#101828">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="SIM Бонус">
+    <meta name="apple-mobile-web-app-title" content="I-MAX">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
@@ -15,34 +15,50 @@
     <script defer src="{{ url_for('static', filename='app_install.js') }}"></script>
 </head>
 <body class="login-body">
-<div class="login-card">
-    <div class="brand login-brand">
-        <div class="brand-mark">SIM</div>
-        <div>
-            <div class="brand-title">SIM Бонус</div>
-            <div class="brand-subtitle">Кириш ойнаси</div>
-        </div>
-    </div>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="messages">
-                {% for category, message in messages %}
-                    <div class="alert {{ category }}">{{ message }}</div>
-                {% endfor %}
+<div class="login-wrapper">
+    <section class="login-showcase">
+        <div class="brand login-brand">
+            <div class="brand-mark">I‑MAX</div>
+            <div>
+                <div class="brand-title">I-MAX</div>
+                <div class="brand-subtitle">SIM бонус назорати</div>
             </div>
-        {% endif %}
-    {% endwith %}
-    <form method="post" class="form-stack">
-        <label>Логин
-            <input type="text" name="username" value="admin" autocomplete="username" required>
-        </label>
-        <label>Пароль
-            <input type="password" name="password" autocomplete="current-password" required>
-        </label>
-        <button type="submit" class="btn primary full">Кириш</button>
-        <button type="button" id="installAppButton" class="btn full install-app-button" hidden>Телефон/компьютерга илова қилиб ўрнатиш</button>
-    </form>
-    <p class="muted small">Биринчи кириш: <b>admin</b> / <b>admin123</b>. Кейин паролни алмаштиринг.</p>
+        </div>
+        <h1>I-MAX бошқарув тизими</h1>
+        <p>Ходимлар кесимида тарифлар сотувини киритиш, ойлик натижани кўриш ва бонусларни тез ҳисоблаш учун тайёр онлайн дастур.</p>
+        <div class="login-feature-list">
+            <div class="feature-pill">Кунлик киритиш</div>
+            <div class="feature-pill">Ойлик ҳисобот</div>
+            <div class="feature-pill">Excel юклаш</div>
+            <div class="feature-pill">PWA илова</div>
+        </div>
+    </section>
+    <section class="login-card">
+        <div class="login-card-head">
+            <div class="small-muted">I-MAX аккаунти</div>
+            <h2>Тизимга кириш</h2>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                    {% for category, message in messages %}
+                        <div class="alert {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <form method="post" class="form-stack">
+            <label>Логин
+                <input type="text" name="username" value="admin" autocomplete="username" required>
+            </label>
+            <label>Пароль
+                <input type="password" name="password" autocomplete="current-password" required>
+            </label>
+            <button type="submit" class="btn primary full">Кириш</button>
+            <button type="button" id="installAppButton" class="btn full install-app-button" hidden>Телефон/компьютерга илова қилиб ўрнатиш</button>
+        </form>
+        <p class="muted small">Биринчи кириш: <b>admin</b> / <b>admin123</b>. Кейин паролни алмаштиринг.</p>
+    </section>
 </div>
 </body>
 </html>
