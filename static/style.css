@@ -371,7 +371,6 @@ label { display: flex; flex-direction: column; gap: 6px; color: #334155; font-we
 }
 .tariff-entry-row:hover { background: #fff; border-color: #fecdd3; }
 .tariff-entry-name { font-weight: 800; color: var(--text); }
-.tariff-entry-bonus { margin-top: 4px; font-size: 13px; color: var(--muted); font-weight: 700; }
 .tariff-entry-qty { font-size: 13px; }
 .tariff-entry-qty input { text-align: right; font-weight: 800; font-size: 18px; }
 .daily-actions { margin-top: 2px; }
