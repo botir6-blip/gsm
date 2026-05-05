@@ -602,6 +602,12 @@ def init_db() -> None:
             statement = statement.strip()
             if statement:
                 conn.execute(text(statement))
+
+        # Агар база аввал бошқа версия/бошқа проект учун ишлатилган бўлса,
+        # CREATE TABLE IF NOT EXISTS мавжуд жадвалларга янги устун қўшмайди.
+        # Шунинг учун керакли устунларни хавфсиз тарзда қўшиб чиқамиз.
+        ensure_schema_compatibility(conn)
+
         user_count = scalar(conn, "SELECT COUNT(*) FROM users")
         if user_count == 0:
             conn.execute(
@@ -612,6 +618,62 @@ def init_db() -> None:
                 text("INSERT INTO audit_logs(action, details, username) VALUES(:action, :details, :username)"),
                 {"action": "Тизим яратилди", "details": "Биринчи admin фойдаланувчи қўшилди", "username": "system"},
             )
+
+
+def ensure_schema_compatibility(conn) -> None:
+    """Add missing columns when an existing Railway/Postgres DB is reused."""
+    columns_by_table = {
+        "users": {
+            "username": "TEXT",
+            "password_hash": "TEXT",
+            "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
+        "employees": {
+            "full_name": "TEXT",
+            "is_active": "INTEGER DEFAULT 1",
+            "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
+        "tariffs": {
+            "name": "TEXT",
+            "bonus_per_item": "INTEGER DEFAULT 0",
+            "is_active": "INTEGER DEFAULT 1",
+            "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
+        "sales": {
+            "sale_date": "TEXT",
+            "employee_id": "INTEGER",
+            "tariff_id": "INTEGER",
+            "quantity": "INTEGER DEFAULT 0",
+            "comment": "TEXT",
+            "created_by": "TEXT",
+            "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "updated_at": "TIMESTAMP",
+        },
+        "month_locks": {
+            "closed_by": "TEXT",
+            "closed_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
+        "audit_logs": {
+            "action": "TEXT",
+            "details": "TEXT",
+            "username": "TEXT",
+            "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
+    }
+
+    if engine.dialect.name == "postgresql":
+        for table, columns in columns_by_table.items():
+            for column, column_type in columns.items():
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {column_type}"))
+        return
+
+    # SQLite учун: ALTER TABLE ... ADD COLUMN IF NOT EXISTS ҳамма муҳитда ишламаслиги мумкин.
+    for table, columns in columns_by_table.items():
+        existing = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
+        for column, column_type in columns.items():
+            if column not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
+
 
 
 def login_required(func):
