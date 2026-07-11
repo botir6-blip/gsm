@@ -840,6 +840,31 @@ def init_db() -> None:
     );
     """
     with engine.begin() as conn:
+        if dialect == "postgresql":
+            # Gunicorn бир нечта worker'ни бир вақтда ишга туширади.
+            # Барча worker'лар бир пайтда DDL бажармаслиги учун база
+            # инициализациясини PostgreSQL advisory lock билан навбатлаймиз.
+            conn.execute(text("SELECT pg_advisory_xact_lock(CAST(hashtext('gsm_sim_bonus_init_db_v2') AS bigint))"))
+
+            # Аввалги параллел старт ярим йўлда тўхтаган бўлса, identity
+            # sequence қолиб, operators жадвали яратилмаган бўлиши мумкин.
+            # Фақат жадвал йўқ ва sequence бор ҳолатдагина уни тозалаймиз.
+            orphan_operator_sequence = conn.execute(
+                text(
+                    """
+                    SELECT
+                        to_regclass('public.operators') IS NULL AS table_missing,
+                        to_regclass('public.operators_id_seq') IS NOT NULL AS sequence_exists
+                    """
+                )
+            ).mappings().first()
+            if (
+                orphan_operator_sequence
+                and orphan_operator_sequence["table_missing"]
+                and orphan_operator_sequence["sequence_exists"]
+            ):
+                conn.execute(text("DROP SEQUENCE public.operators_id_seq"))
+
         for statement in schema.split(";"):
             statement = statement.strip()
             if statement:
