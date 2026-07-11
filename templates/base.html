@@ -3,11 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}I-MAX | SIM Бонус{% endblock %}</title>
-    <meta name="theme-color" content="#101828">
+    <title>{% block title %}SIM ҳисоби{% endblock %}</title>
+    <meta name="theme-color" content="#102a47">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="I-MAX">
+    <meta name="apple-mobile-web-app-title" content="SIM ҳисоби">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
@@ -17,43 +17,46 @@
 <body>
 <div class="app-shell">
     <aside class="sidebar">
-        <div class="brand brand-main">
-            <div class="brand-mark">I‑MAX</div>
-            <div>
-                <div class="brand-title">I-MAX</div>
-                <div class="brand-subtitle">SIM бонус назорати</div>
-            </div>
-        </div>
-        <div class="brand-chip">Корпоратив бошқарув панели</div>
+        <a class="brand brand-main" href="{{ url_for('dashboard') }}">
+            <span class="brand-mark">S</span>
+            <span class="brand-title">SIM ҲИСОБИ</span>
+        </a>
+
         <nav class="nav">
-            <a class="nav-link {{ 'active' if active == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Бош саҳифа</a>
-            <a class="nav-link {{ 'active' if active == 'employees' else '' }}" href="{{ url_for('employees') }}">Ходимлар</a>
-            <a class="nav-link {{ 'active' if active == 'operators' else '' }}" href="{{ url_for('operators') }}">Операторлар</a>
-            <a class="nav-link {{ 'active' if active == 'tariffs' else '' }}" href="{{ url_for('tariffs') }}">Тарифлар</a>
-            <a class="nav-link {{ 'active' if active == 'sale_new' else '' }}" href="{{ url_for('sale_new') }}">Кунлик сотув киритиш</a>
-            <a class="nav-link {{ 'active' if active == 'sales_journal' else '' }}" href="{{ url_for('sales_journal') }}">Сотувлар журнали</a>
-            <a class="nav-link {{ 'active' if active == 'report' else '' }}" href="{{ url_for('report') }}">Ойлик ҳисобот</a>
-            <a class="nav-link {{ 'active' if active == 'audit' else '' }}" href="{{ url_for('audit') }}">Ўзгаришлар журнали</a>
-            <a class="nav-link {{ 'active' if active == 'password' else '' }}" href="{{ url_for('change_password') }}">Паролни ўзгартириш</a>
-            <a class="nav-link danger" href="{{ url_for('logout') }}">Чиқиш</a>
+            <a class="nav-link {{ 'active' if active == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}"><span class="nav-icon">⌂</span><span>Асосий</span></a>
+            <a class="nav-link {{ 'active' if active == 'sale_new' else '' }}" href="{{ url_for('sale_new') }}"><span class="nav-icon">＋</span><span>Сотув</span></a>
+            <a class="nav-link {{ 'active' if active == 'tariffs' else '' }}" href="{{ url_for('tariffs') }}"><span class="nav-icon">▣</span><span>Тарифлар</span></a>
+            <a class="nav-link {{ 'active' if active == 'operators' else '' }}" href="{{ url_for('operators') }}"><span class="nav-icon">◎</span><span>Операторлар</span></a>
+            <a class="nav-link {{ 'active' if active == 'report' else '' }}" href="{{ url_for('report') }}"><span class="nav-icon">▥</span><span>Ҳисобот</span></a>
+
+            <details class="nav-more" {% if active in ['employees','sales_journal','audit','password'] %}open{% endif %}>
+                <summary><span class="nav-icon">⋯</span><span>Бошқалар</span></summary>
+                <div class="nav-submenu">
+                    <a class="nav-sublink {{ 'active' if active == 'employees' else '' }}" href="{{ url_for('employees') }}">Ходимлар</a>
+                    <a class="nav-sublink {{ 'active' if active == 'sales_journal' else '' }}" href="{{ url_for('sales_journal') }}">Сотувлар журнали</a>
+                    <a class="nav-sublink {{ 'active' if active == 'audit' else '' }}" href="{{ url_for('audit') }}">Ўзгаришлар тарихи</a>
+                    <a class="nav-sublink {{ 'active' if active == 'password' else '' }}" href="{{ url_for('change_password') }}">Парол</a>
+                </div>
+            </details>
         </nav>
-        <div class="sidebar-note">
-            <div class="sidebar-note-title">I-MAX</div>
-            <div class="sidebar-note-text">Mobiuz, Uzmobile ва бошқа операторлар кесимида SIM-карта сотуви ҳамда бонусларни назорат қилиш учун қулай интерфейс.</div>
+
+        <div class="sidebar-bottom">
+            <button type="button" id="installAppButton" class="sidebar-install" hidden>Иловани ўрнатиш</button>
+            <a class="nav-link logout-link" href="{{ url_for('logout') }}"><span class="nav-icon">↪</span><span>Чиқиш</span></a>
         </div>
     </aside>
+
     <main class="content">
-        <header class="topbar topbar-panel">
+        <header class="topbar">
             <div>
-                <div class="brand-line">I-MAX</div>
-                <h1>{% block header %}I-MAX SIM Бонус{% endblock %}</h1>
-                <p>{% block subheader %}Оператор ва тарифлар бўйича кунлик сотув ҳамда ойлик бонус ҳисоботи{% endblock %}</p>
+                <h1>{% block header %}Асосий{% endblock %}</h1>
+                <p>{% block subheader %}{% endblock %}</p>
             </div>
             <div class="topbar-actions">
-                <button type="button" id="installAppButton" class="btn small install-app-button" hidden>Илова сифатида ўрнатиш</button>
-                <div class="user-pill">{{ session.get('username', 'admin') }}</div>
+                <div class="user-pill"><span class="user-avatar">{{ session.get('username', 'A')[:1]|upper }}</span><span>{{ session.get('username', 'admin') }}</span></div>
             </div>
         </header>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="messages">
@@ -63,8 +66,9 @@
                 </div>
             {% endif %}
         {% endwith %}
+
         {% block content %}{% endblock %}
-        <footer class="footer-note">© {{ current_year }} I-MAX — SIM операторлар, тарифлар ва бонуслар ҳисоби</footer>
+        <footer class="footer-note">© {{ current_year }} SIM ҳисоби</footer>
     </main>
 </div>
 </body>

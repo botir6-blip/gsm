@@ -1,16 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Бош саҳифа | I-MAX{% endblock %}
-{% block header %}I-MAX назорат панели{% endblock %}
-{% block subheader %}Операторлар бўйича кунлик сотув, ойлик натижа ва бонуслар ҳолати{% endblock %}
+{% block title %}Асосий | SIM ҳисоби{% endblock %}
+{% block header %}Асосий{% endblock %}
+{% block subheader %}Сотув ва бонуслар ҳолати{% endblock %}
 {% block content %}
-<section class="hero-banner panel">
-    <div>
-        <div class="hero-eyebrow">I-MAX</div>
-        <h2>SIM бонусларни бошқариш маркази</h2>
-        <p>Mobiuz, Uzmobile ва бошқа операторлар бўйича кунлик сотувлар ҳамда ойлик бонус натижаларини бир жойда кўрасиз.</p>
-    </div>
-    <form method="get" class="toolbar hero-toolbar">
-        <label>Оператор
+<section class="dashboard-filter">
+    <form method="get" class="dashboard-filter-form">
+        <label>
+            <span>Оператор</span>
             <select name="operator_id">
                 <option value="0">Барча операторлар</option>
                 {% for operator in operators %}
@@ -18,64 +14,61 @@
                 {% endfor %}
             </select>
         </label>
-        <label>Ой
+        <label>
+            <span>Ой</span>
             <input type="month" name="month" value="{{ month }}">
         </label>
         <button class="btn primary" type="submit">Кўрсатиш</button>
     </form>
 </section>
 
-<div class="cards-grid">
-    <div class="stat-card accent-red">
-        <div class="stat-label">Бугун сотилган SIM</div>
-        <div class="stat-value">{{ total_today|qty }}</div>
+<div class="cards-grid dashboard-stats">
+    <div class="stat-card">
+        <div class="stat-icon blue">▣</div>
+        <div><div class="stat-label">Бугун сотилди</div><div class="stat-value">{{ total_today|qty }} <small>та</small></div></div>
     </div>
-    <div class="stat-card accent-blue">
-        <div class="stat-label">{{ month }} ойида жами SIM</div>
-        <div class="stat-value">{{ total_month|qty }}</div>
+    <div class="stat-card">
+        <div class="stat-icon green">↗</div>
+        <div><div class="stat-label">Ой бўйича</div><div class="stat-value">{{ total_month|qty }} <small>та</small></div></div>
     </div>
-    <div class="stat-card accent-gold">
-        <div class="stat-label">{{ month }} ойида жами бонус</div>
-        <div class="stat-value">{{ bonus_month|money }} сўм</div>
+    <div class="stat-card">
+        <div class="stat-icon orange">◫</div>
+        <div><div class="stat-label">Жами бонус</div><div class="stat-value">{{ bonus_month|money }} <small>сўм</small></div></div>
     </div>
 </div>
 
-<div class="two-col">
+<div class="two-col dashboard-tables">
     <section class="panel">
-        <div class="panel-head">
-            <div class="panel-title">Ходимлар бўйича ТОП</div>
-            <span class="panel-tag">{% if operator_id %}Танланган оператор{% else %}Барча операторлар{% endif %}</span>
-        </div>
-        <div class="table-wrap">
+        <div class="panel-head"><div class="panel-title">Энг яхши ходимлар</div></div>
+        <div class="table-wrap compact-table">
             <table>
-                <thead><tr><th>Ходим Ф.И.О.</th><th>Сони</th><th>Бонус</th></tr></thead>
+                <thead><tr><th>Ходим</th><th class="num">Сони</th><th class="num">Бонус</th></tr></thead>
                 <tbody>
                 {% for row in top_employees %}
-                    <tr><td>{{ row.full_name }}</td><td class="num">{{ row.qty|qty }}</td><td class="num">{{ row.bonus|money }}</td></tr>
-                {% else %}
-                    <tr><td colspan="3" class="empty">Маълумот йўқ</td></tr>
-                {% endfor %}
+                    <tr><td><span class="rank-dot">{{ loop.index }}</span>{{ row.full_name }}</td><td class="num strong">{{ row.qty|qty }}</td><td class="num">{{ row.bonus|money }}</td></tr>
+                {% else %}<tr><td colspan="3" class="empty">Маълумот йўқ</td></tr>{% endfor %}
                 </tbody>
             </table>
         </div>
     </section>
+
     <section class="panel">
-        <div class="panel-head">
-            <div class="panel-title">Тарифлар бўйича ТОП</div>
-            <span class="panel-tag">Оператор кесимида</span>
-        </div>
-        <div class="table-wrap">
+        <div class="panel-head"><div class="panel-title">Энг кўп сотилган тарифлар</div></div>
+        <div class="table-wrap compact-table">
             <table>
-                <thead><tr><th>Оператор</th><th>Тариф номи</th><th>Сони</th></tr></thead>
+                <thead><tr><th>Оператор / тариф</th><th class="num">Сони</th></tr></thead>
                 <tbody>
                 {% for row in top_tariffs %}
-                    <tr><td>{{ row.operator_name }}</td><td>{{ row.name|tariff_name }}</td><td class="num">{{ row.qty|qty }}</td></tr>
-                {% else %}
-                    <tr><td colspan="3" class="empty">Маълумот йўқ</td></tr>
-                {% endfor %}
+                    <tr><td><span class="operator-dot"></span><strong>{{ row.operator_name }}</strong><div class="table-subtext">{{ row.name|tariff_name }}</div></td><td class="num strong">{{ row.qty|qty }}</td></tr>
+                {% else %}<tr><td colspan="2" class="empty">Маълумот йўқ</td></tr>{% endfor %}
                 </tbody>
             </table>
         </div>
     </section>
+</div>
+
+<div class="quick-actions">
+    <a href="{{ url_for('sale_new') }}" class="quick-action primary-action"><span class="quick-icon">＋</span><span><strong>Кунлик сотув</strong><small>Янги сотув киритиш</small></span><b>›</b></a>
+    <a href="{{ url_for('sales_journal') }}" class="quick-action"><span class="quick-icon">▤</span><span><strong>Журнал</strong><small>Барча ёзувларни кўриш</small></span><b>›</b></a>
 </div>
 {% endblock %}
