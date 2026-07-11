@@ -1388,15 +1388,17 @@ def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
         summary = fetch_all(
             conn,
             f"""
-            SELECT e.full_name,
+            SELECT o.id AS operator_id, o.name AS operator_name,
+                   e.id AS employee_id, e.full_name,
                    SUM(s.quantity) AS total_qty,
                    SUM(s.quantity * t.bonus_per_item) AS total_bonus
             FROM sales s
             JOIN employees e ON e.id = s.employee_id
             JOIN tariffs t ON t.id = s.tariff_id
+            JOIN operators o ON o.id = t.operator_id
             WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
-            GROUP BY e.id, e.full_name
-            ORDER BY total_bonus DESC, e.full_name
+            GROUP BY o.id, o.name, e.id, e.full_name
+            ORDER BY o.name, total_bonus DESC, e.full_name
             """,
             params,
         )
@@ -1426,9 +1428,27 @@ def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
             """,
             params,
         )
+    employee_summary_by_operator: list[dict[str, Any]] = []
+    grouped: dict[int, dict[str, Any]] = {}
+    for row in summary:
+        op_id = int(row["operator_id"])
+        if op_id not in grouped:
+            grouped[op_id] = {
+                "operator_id": op_id,
+                "operator_name": row["operator_name"],
+                "rows": [],
+                "total_qty": 0,
+                "total_bonus": 0,
+            }
+            employee_summary_by_operator.append(grouped[op_id])
+        grouped[op_id]["rows"].append(row)
+        grouped[op_id]["total_qty"] += int(row["total_qty"] or 0)
+        grouped[op_id]["total_bonus"] += int(row["total_bonus"] or 0)
+
     return {
         "detail": detail,
         "summary": summary,
+        "employee_summary_by_operator": employee_summary_by_operator,
         "operator_summary": operator_summary,
         "totals": totals or {"total_qty": 0, "total_bonus": 0},
     }
@@ -1493,22 +1513,38 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
         cell.font = Font(bold=True)
 
     ws2 = wb.create_sheet("Ходимлар бўйича жами")
-    ws2.append([f"I-MAX — ходимлар бўйича умумий натижа — {month}"])
+    ws2.append([f"I-MAX — ходимлар бўйича операторлар кесимида — {month}"])
     ws2.merge_cells("A1:C1")
     ws2["A1"].font = Font(size=14, bold=True)
     ws2["A1"].alignment = Alignment(horizontal="center")
     ws2.append([])
-    ws2.append(["Ходим Ф.И.О.", "Жами SIM", "Жами бонус"])
-    for cell in ws2[3]:
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill("solid", fgColor="D9EAF7")
-        cell.alignment = Alignment(horizontal="center")
-    for row in data["summary"]:
-        ws2.append([row["full_name"], row["total_qty"], row["total_bonus"]])
-    ws2.append([])
-    ws2.append(["ЖАМИ", data["totals"]["total_qty"], data["totals"]["total_bonus"]])
+
+    for group in data["employee_summary_by_operator"]:
+        ws2.append([group["operator_name"], "", ""])
+        operator_row = ws2.max_row
+        ws2.merge_cells(start_row=operator_row, start_column=1, end_row=operator_row, end_column=3)
+        ws2.cell(operator_row, 1).font = Font(bold=True, size=12)
+        ws2.cell(operator_row, 1).fill = PatternFill("solid", fgColor="DBEAFE")
+
+        ws2.append(["Ходим Ф.И.О.", "Жами SIM", "Жами бонус"])
+        for cell in ws2[ws2.max_row]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill("solid", fgColor="EFF6FF")
+            cell.alignment = Alignment(horizontal="center")
+
+        for row in group["rows"]:
+            ws2.append([row["full_name"], row["total_qty"], row["total_bonus"]])
+
+        ws2.append([f"{group['operator_name']} ЖАМИ", group["total_qty"], group["total_bonus"]])
+        for cell in ws2[ws2.max_row]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill("solid", fgColor="E8F0FE")
+        ws2.append([])
+
+    ws2.append(["УМУМИЙ ЖАМИ", data["totals"]["total_qty"], data["totals"]["total_bonus"]])
     for cell in ws2[ws2.max_row]:
         cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="D9EAF7")
 
     ws3 = wb.create_sheet("Операторлар бўйича")
     ws3.append([f"I-MAX — операторлар бўйича натижа — {month}"])
