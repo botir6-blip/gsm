@@ -95,18 +95,44 @@
 
 <section class="panel">
     <div class="panel-title">Ходимлар бўйича жами</div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Ходим Ф.И.О.</th><th>Жами SIM</th><th>Жами бонус</th></tr></thead>
-            <tbody>
-            {% for row in summary %}
-            <tr><td>{{ row.full_name }}</td><td class="num">{{ row.total_qty|qty }}</td><td class="num strong">{{ row.total_bonus|money }}</td></tr>
-            {% else %}
-            <tr><td colspan="3" class="empty">Маълумот йўқ</td></tr>
-            {% endfor %}
-            </tbody>
-            <tfoot><tr><th>ЖАМИ</th><th class="num">{{ totals.total_qty|qty }}</th><th class="num">{{ totals.total_bonus|money }}</th></tr></tfoot>
-        </table>
+
+    {% for group in employee_summary_by_operator %}
+    <div class="operator-report-group">
+        <div class="operator-report-title">
+            <span>{{ group.operator_name }}</span>
+            <span class="operator-report-total">{{ group.total_qty|qty }} SIM · {{ group.total_bonus|money }} сўм</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Ходим Ф.И.О.</th><th>Жами SIM</th><th>Жами бонус</th></tr></thead>
+                <tbody>
+                {% for row in group.rows %}
+                <tr>
+                    <td>{{ row.full_name }}</td>
+                    <td class="num">{{ row.total_qty|qty }}</td>
+                    <td class="num strong">{{ row.total_bonus|money }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th>{{ group.operator_name }} ЖАМИ</th>
+                        <th class="num">{{ group.total_qty|qty }}</th>
+                        <th class="num">{{ group.total_bonus|money }}</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
+    {% else %}
+    <div class="empty">Маълумот йўқ</div>
+    {% endfor %}
+
+    {% if employee_summary_by_operator|length > 1 %}
+    <div class="report-grand-total">
+        <span>УМУМИЙ ЖАМИ</span>
+        <strong>{{ totals.total_qty|qty }} SIM · {{ totals.total_bonus|money }} сўм</strong>
+    </div>
+    {% endif %}
 </section>
 {% endblock %}
