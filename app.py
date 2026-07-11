@@ -78,59 +78,76 @@ def create_app() -> Flask:
     def dashboard() -> str:
         today = date.today().isoformat()
         month = request.args.get("month") or date.today().strftime("%Y-%m")
+        operator_id = parse_int(request.args.get("operator_id"))
+        operator_where = " AND t.operator_id = :operator_id" if operator_id else ""
+        params = {"month": month, "today": today, "operator_id": operator_id}
         with engine.connect() as conn:
+            operators = fetch_all(conn, "SELECT * FROM operators ORDER BY is_active DESC, name")
             total_today = scalar(
                 conn,
-                "SELECT COALESCE(SUM(quantity), 0) AS total FROM sales WHERE sale_date = :today",
-                {"today": today},
+                f"""
+                SELECT COALESCE(SUM(s.quantity), 0) AS total
+                FROM sales s
+                JOIN tariffs t ON t.id = s.tariff_id
+                WHERE s.sale_date = :today {operator_where}
+                """,
+                params,
             )
             total_month = scalar(
                 conn,
-                "SELECT COALESCE(SUM(quantity), 0) AS total FROM sales WHERE substr(sale_date, 1, 7) = :month",
-                {"month": month},
+                f"""
+                SELECT COALESCE(SUM(s.quantity), 0) AS total
+                FROM sales s
+                JOIN tariffs t ON t.id = s.tariff_id
+                WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+                """,
+                params,
             )
             bonus_month = scalar(
                 conn,
-                """
+                f"""
                 SELECT COALESCE(SUM(s.quantity * t.bonus_per_item), 0) AS total
                 FROM sales s
                 JOIN tariffs t ON t.id = s.tariff_id
-                WHERE substr(s.sale_date, 1, 7) = :month
+                WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
                 """,
-                {"month": month},
+                params,
             )
             top_employees = fetch_all(
                 conn,
-                """
+                f"""
                 SELECT e.full_name, COALESCE(SUM(s.quantity), 0) AS qty,
                        COALESCE(SUM(s.quantity * t.bonus_per_item), 0) AS bonus
                 FROM sales s
                 JOIN employees e ON e.id = s.employee_id
                 JOIN tariffs t ON t.id = s.tariff_id
-                WHERE substr(s.sale_date, 1, 7) = :month
+                WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
                 GROUP BY e.id, e.full_name
                 ORDER BY qty DESC, e.full_name
                 LIMIT 10
                 """,
-                {"month": month},
+                params,
             )
             top_tariffs = fetch_all(
                 conn,
-                """
-                SELECT t.name, COALESCE(SUM(s.quantity), 0) AS qty
+                f"""
+                SELECT t.name, o.name AS operator_name, COALESCE(SUM(s.quantity), 0) AS qty
                 FROM sales s
                 JOIN tariffs t ON t.id = s.tariff_id
-                WHERE substr(s.sale_date, 1, 7) = :month
-                GROUP BY t.id, t.name
-                ORDER BY qty DESC, t.name
+                JOIN operators o ON o.id = t.operator_id
+                WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+                GROUP BY t.id, t.name, o.id, o.name
+                ORDER BY qty DESC, o.name, t.name
                 LIMIT 10
                 """,
-                {"month": month},
+                params,
             )
         return render_template(
             "dashboard.html",
             active="dashboard",
             month=month,
+            operator_id=operator_id,
+            operators=operators,
             total_today=total_today,
             total_month=total_month,
             bonus_month=bonus_month,
@@ -248,18 +265,112 @@ def create_app() -> Flask:
                 flash("Бу Ф.И.О. бошқа ходимда бор.", "warning")
         return redirect(url_for("employees"))
 
+    @app.route("/operators")
+    @login_required
+    def operators() -> str:
+        with engine.connect() as conn:
+            rows = fetch_all(conn, "SELECT * FROM operators ORDER BY is_active DESC, name")
+        return render_template("operators.html", active="operators", rows=rows)
+
+    @app.route("/operators/add", methods=["POST"])
+    @login_required
+    def add_operator() -> Response:
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Оператор номи киритилмаган.", "danger")
+            return redirect(url_for("operators"))
+        try:
+            with engine.begin() as conn:
+                existing = fetch_one(
+                    conn,
+                    "SELECT id FROM operators WHERE lower(trim(name)) = lower(trim(:name))",
+                    {"name": name},
+                )
+                if existing:
+                    flash("Бу оператор аллақачон бор.", "warning")
+                    return redirect(url_for("operators"))
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO operators(id, name, is_active, created_at)
+                        VALUES(:id, :name, 1, :created_at)
+                        """
+                    ),
+                    {"id": next_id(conn, "operators"), "name": name, "created_at": current_timestamp()},
+                )
+                add_audit(conn, "Оператор қўшилди", name)
+            flash("Оператор қўшилди.", "success")
+        except IntegrityError:
+            flash("Бу оператор аллақачон бор.", "warning")
+        except SQLAlchemyError as exc:
+            flash(f"Оператор қўшишда база хатоси: {db_error_text(exc)}", "danger")
+        return redirect(url_for("operators"))
+
+    @app.route("/operators/<int:operator_id>/edit", methods=["POST"])
+    @login_required
+    def edit_operator(operator_id: int) -> Response:
+        name = request.form.get("name", "").strip()
+        is_active = 1 if request.form.get("is_active") == "on" else 0
+        if not name:
+            flash("Оператор номи бўш бўлмаслиги керак.", "danger")
+            return redirect(url_for("operators"))
+        try:
+            with engine.begin() as conn:
+                duplicate = fetch_one(
+                    conn,
+                    """
+                    SELECT id FROM operators
+                    WHERE lower(trim(name)) = lower(trim(:name)) AND id <> :id
+                    """,
+                    {"name": name, "id": operator_id},
+                )
+                if duplicate:
+                    flash("Бу оператор номи бошқа операторда бор.", "warning")
+                    return redirect(url_for("operators"))
+                conn.execute(
+                    text("UPDATE operators SET name = :name, is_active = :is_active WHERE id = :id"),
+                    {"name": name, "is_active": is_active, "id": operator_id},
+                )
+                add_audit(conn, "Оператор ўзгартирилди", f"operator_id={operator_id}; {name}")
+            flash("Оператор маълумоти сақланди.", "success")
+        except SQLAlchemyError as exc:
+            flash(f"Операторни сақлашда база хатоси: {db_error_text(exc)}", "danger")
+        return redirect(url_for("operators"))
+
     @app.route("/tariffs")
     @login_required
     def tariffs() -> str:
+        operator_id = parse_int(request.args.get("operator_id"))
         with engine.connect() as conn:
-            rows = fetch_all(conn, "SELECT * FROM tariffs ORDER BY is_active DESC, name")
-        return render_template("tariffs.html", active="tariffs", rows=rows)
+            operators_list = fetch_all(conn, "SELECT * FROM operators ORDER BY is_active DESC, name")
+            sql = """
+                SELECT t.*, o.name AS operator_name
+                FROM tariffs t
+                JOIN operators o ON o.id = t.operator_id
+            """
+            params: dict[str, Any] = {}
+            if operator_id:
+                sql += " WHERE t.operator_id = :operator_id"
+                params["operator_id"] = operator_id
+            sql += " ORDER BY o.name, t.is_active DESC, t.name"
+            rows = fetch_all(conn, sql, params)
+        return render_template(
+            "tariffs.html",
+            active="tariffs",
+            rows=rows,
+            operators=operators_list,
+            operator_id=operator_id,
+        )
 
     @app.route("/tariffs/add", methods=["POST"])
     @login_required
     def add_tariff() -> Response:
+        operator_id = parse_int(request.form.get("operator_id"))
         name = tariff_name_display(request.form.get("name", ""))
         bonus = parse_int(request.form.get("bonus_per_item"))
+        if operator_id <= 0:
+            flash("Оператор танланмаган.", "danger")
+            return redirect(url_for("tariffs"))
         if not name:
             flash("Тариф номи киритилмаган.", "danger")
             return redirect(url_for("tariffs"))
@@ -270,8 +381,12 @@ def create_app() -> Flask:
             with engine.begin() as conn:
                 existing = fetch_one(
                     conn,
-                    "SELECT id FROM tariffs WHERE lower(trim(name)) = lower(trim(:name))",
-                    {"name": name},
+                    """
+                    SELECT id FROM tariffs
+                    WHERE operator_id = :operator_id
+                      AND lower(trim(name)) = lower(trim(:name))
+                    """,
+                    {"operator_id": operator_id, "name": name},
                 )
                 if existing:
                     flash("Бу тариф аллақачон бор.", "warning")
@@ -279,13 +394,21 @@ def create_app() -> Flask:
                 conn.execute(
                     text(
                         """
-                        INSERT INTO tariffs(id, name, bonus_per_item, is_active, created_at)
-                        VALUES(:id, :name, :bonus, 1, :created_at)
+                        INSERT INTO tariffs(id, operator_id, name, bonus_per_item, is_active, created_at)
+                        VALUES(:id, :operator_id, :name, :bonus, 1, :created_at)
                         """
                     ),
-                    {"id": next_id(conn, "tariffs"), "name": name, "bonus": bonus, "created_at": current_timestamp()},
+                    {
+                        "id": next_id(conn, "tariffs"),
+                        "operator_id": operator_id,
+                        "name": name,
+                        "bonus": bonus,
+                        "created_at": current_timestamp(),
+                    },
                 )
-                add_audit(conn, "Тариф қўшилди", f"{name}; бонус={bonus}")
+                operator = fetch_one(conn, "SELECT name FROM operators WHERE id = :id", {"id": operator_id})
+                operator_name = operator["name"] if operator else str(operator_id)
+                add_audit(conn, "Тариф қўшилди", f"{operator_name}; {name}; бонус={bonus}")
             flash("Тариф қўшилди.", "success")
         except IntegrityError as exc:
             flash(integrity_message(exc, "Бу тариф аллақачон бор."), "warning")
@@ -296,9 +419,13 @@ def create_app() -> Flask:
     @app.route("/tariffs/<int:tariff_id>/edit", methods=["POST"])
     @login_required
     def edit_tariff(tariff_id: int) -> Response:
+        operator_id = parse_int(request.form.get("operator_id"))
         name = tariff_name_display(request.form.get("name", ""))
         bonus = parse_int(request.form.get("bonus_per_item"))
         is_active = 1 if request.form.get("is_active") == "on" else 0
+        if operator_id <= 0:
+            flash("Оператор танланмаган.", "danger")
+            return redirect(url_for("tariffs"))
         if not name:
             flash("Тариф номи бўш бўлмаслиги керак.", "danger")
             return redirect(url_for("tariffs"))
@@ -307,20 +434,48 @@ def create_app() -> Flask:
             return redirect(url_for("tariffs"))
         with engine.begin() as conn:
             try:
+                duplicate = fetch_one(
+                    conn,
+                    """
+                    SELECT id FROM tariffs
+                    WHERE operator_id = :operator_id
+                      AND lower(trim(name)) = lower(trim(:name))
+                      AND id <> :id
+                    """,
+                    {"operator_id": operator_id, "name": name, "id": tariff_id},
+                )
+                if duplicate:
+                    flash("Бу операторда ушбу тариф аллақачон бор.", "warning")
+                    return redirect(url_for("tariffs"))
                 conn.execute(
                     text(
                         """
                         UPDATE tariffs
-                        SET name = :name, bonus_per_item = :bonus, is_active = :is_active
+                        SET operator_id = :operator_id,
+                            name = :name,
+                            bonus_per_item = :bonus,
+                            is_active = :is_active
                         WHERE id = :id
                         """
                     ),
-                    {"name": name, "bonus": bonus, "is_active": is_active, "id": tariff_id},
+                    {
+                        "operator_id": operator_id,
+                        "name": name,
+                        "bonus": bonus,
+                        "is_active": is_active,
+                        "id": tariff_id,
+                    },
                 )
-                add_audit(conn, "Тариф ўзгартирилди", f"tariff_id={tariff_id}; {name}; бонус={bonus}")
+                operator = fetch_one(conn, "SELECT name FROM operators WHERE id = :id", {"id": operator_id})
+                operator_name = operator["name"] if operator else str(operator_id)
+                add_audit(
+                    conn,
+                    "Тариф ўзгартирилди",
+                    f"tariff_id={tariff_id}; {operator_name}; {name}; бонус={bonus}",
+                )
                 flash("Тариф сақланди.", "success")
             except IntegrityError:
-                flash("Бу тариф номи бошқа тарифда бор.", "warning")
+                flash("Бу операторда ушбу тариф номи аллақачон бор.", "warning")
         return redirect(url_for("tariffs"))
 
     @app.route("/sales/new", methods=["GET", "POST"])
@@ -376,7 +531,17 @@ def create_app() -> Flask:
     @login_required
     def sale_edit(sale_id: int) -> str | Response:
         with engine.connect() as conn:
-            sale = fetch_one(conn, "SELECT * FROM sales WHERE id = :id", {"id": sale_id})
+            sale = fetch_one(
+                conn,
+                """
+                SELECT s.*, t.operator_id, o.name AS operator_name
+                FROM sales s
+                JOIN tariffs t ON t.id = s.tariff_id
+                JOIN operators o ON o.id = t.operator_id
+                WHERE s.id = :id
+                """,
+                {"id": sale_id},
+            )
         if not sale:
             flash("Сотув топилмади.", "danger")
             return redirect(url_for("sales_journal"))
@@ -474,7 +639,7 @@ def create_app() -> Flask:
     def sales_journal() -> str:
         filters = get_filters()
         rows = fetch_sales(filters)
-        employees_list, tariffs_list = get_all_refs()
+        employees_list, tariffs_list, operators_list = get_all_refs()
         return render_template(
             "sales_journal.html",
             active="sales_journal",
@@ -482,34 +647,49 @@ def create_app() -> Flask:
             filters=filters,
             employees=employees_list,
             tariffs=tariffs_list,
+            operators=operators_list,
         )
 
     @app.route("/report")
     @login_required
     def report() -> str:
         month = request.args.get("month") or date.today().strftime("%Y-%m")
-        data = build_report(month)
+        operator_id = parse_int(request.args.get("operator_id"))
+        data = build_report(month, operator_id)
         closed = is_month_closed(month)
-        return render_template("report.html", active="report", month=month, closed=closed, **data)
+        with engine.connect() as conn:
+            operators_list = fetch_all(conn, "SELECT * FROM operators ORDER BY is_active DESC, name")
+        return render_template(
+            "report.html",
+            active="report",
+            month=month,
+            operator_id=operator_id,
+            operators=operators_list,
+            closed=closed,
+            **data,
+        )
 
     @app.route("/report/export")
     @login_required
     def report_export() -> Response:
         month = request.args.get("month") or date.today().strftime("%Y-%m")
-        data = build_report(month)
+        operator_id = parse_int(request.args.get("operator_id"))
+        data = build_report(month, operator_id)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         tmp.close()
         file_path = Path(tmp.name)
         create_excel_report(file_path, month, data)
-        return send_file(file_path, as_attachment=True, download_name=f"bonus_hisobot_{month}.xlsx")
+        suffix = f"_operator_{operator_id}" if operator_id else "_barcha_operatorlar"
+        return send_file(file_path, as_attachment=True, download_name=f"bonus_hisobot_{month}{suffix}.xlsx")
 
     @app.route("/month/close", methods=["POST"])
     @login_required
     def month_close() -> Response:
         month = request.form.get("month", "").strip()
+        operator_id = parse_int(request.form.get("operator_id"))
         if not is_valid_month(month):
             flash("Ой формати нотўғри.", "danger")
-            return redirect(url_for("report"))
+            return redirect(url_for("report", operator_id=operator_id))
         with engine.begin() as conn:
             existing = fetch_one(conn, "SELECT month FROM month_locks WHERE month = :month", {"month": month})
             if not existing:
@@ -519,21 +699,22 @@ def create_app() -> Flask:
                 )
                 add_audit(conn, "Ой ёпилди", month)
         flash(f"{month} ойи ёпилди.", "success")
-        return redirect(url_for("report", month=month))
+        return redirect(url_for("report", month=month, operator_id=operator_id))
 
     @app.route("/month/open", methods=["POST"])
     @login_required
     def month_open() -> Response:
         month = request.form.get("month", "").strip()
+        operator_id = parse_int(request.form.get("operator_id"))
         reason = request.form.get("reason", "").strip()
         if not reason:
             flash("Ойни қайта очиш сабаби киритилиши шарт.", "danger")
-            return redirect(url_for("report", month=month))
+            return redirect(url_for("report", month=month, operator_id=operator_id))
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM month_locks WHERE month = :month"), {"month": month})
             add_audit(conn, "Ой қайта очилди", f"{month}; сабаб: {reason}")
         flash(f"{month} ойи қайта очилди.", "success")
-        return redirect(url_for("report", month=month))
+        return redirect(url_for("report", month=month, operator_id=operator_id))
 
     @app.route("/audit")
     @login_required
@@ -557,7 +738,7 @@ def scalar(conn, sql: str, params: dict[str, Any] | None = None) -> Any:
     return conn.execute(text(sql), params or {}).scalar() or 0
 
 
-ALLOWED_ID_TABLES = {"users", "employees", "tariffs", "sales", "audit_logs"}
+ALLOWED_ID_TABLES = {"users", "employees", "operators", "tariffs", "sales", "audit_logs"}
 
 
 def current_timestamp() -> datetime:
@@ -611,12 +792,22 @@ def init_db() -> None:
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS tariffs (
+    CREATE TABLE IF NOT EXISTS operators (
         id {id_column},
         name TEXT NOT NULL UNIQUE,
-        bonus_per_item INTEGER NOT NULL DEFAULT 0,
         is_active INTEGER NOT NULL DEFAULT 1,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS tariffs (
+        id {id_column},
+        operator_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        bonus_per_item INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(operator_id) REFERENCES operators(id),
+        UNIQUE(operator_id, name)
     );
 
     CREATE TABLE IF NOT EXISTS sales (
@@ -658,6 +849,7 @@ def init_db() -> None:
         # CREATE TABLE IF NOT EXISTS мавжуд жадвалларга янги устун қўшмайди.
         # Шунинг учун керакли устунларни хавфсиз тарзда қўшиб чиқамиз.
         ensure_schema_compatibility(conn)
+        ensure_default_operators(conn)
 
         # Эски база қайта ишлатилганда users жадвалида бошқа фойдаланувчилар бўлиши мумкин.
         # Шунинг учун admin бор-йўқлигини умумий user_count билан эмас, username орқали текширамиз.
@@ -727,7 +919,13 @@ def ensure_schema_compatibility(conn) -> None:
             "is_active": "INTEGER DEFAULT 1",
             "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         },
+        "operators": {
+            "name": "TEXT",
+            "is_active": "INTEGER DEFAULT 1",
+            "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        },
         "tariffs": {
+            "operator_id": "INTEGER",
             "name": "TEXT",
             "bonus_per_item": "INTEGER DEFAULT 0",
             "is_active": "INTEGER DEFAULT 1",
@@ -763,6 +961,7 @@ def ensure_schema_compatibility(conn) -> None:
         postgres_defaults = {
             "users": {"created_at": "CURRENT_TIMESTAMP"},
             "employees": {"is_active": "1", "created_at": "CURRENT_TIMESTAMP"},
+            "operators": {"is_active": "1", "created_at": "CURRENT_TIMESTAMP"},
             "tariffs": {"bonus_per_item": "0", "is_active": "1", "created_at": "CURRENT_TIMESTAMP"},
             "sales": {"quantity": "0", "created_at": "CURRENT_TIMESTAMP"},
             "month_locks": {"closed_at": "CURRENT_TIMESTAMP"},
@@ -782,6 +981,70 @@ def ensure_schema_compatibility(conn) -> None:
                 safe_column_type = column_type.replace(" DEFAULT CURRENT_TIMESTAMP", "")
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {safe_column_type}"))
 
+
+
+def ensure_default_operators(conn) -> None:
+    """Create default operators and attach all old tariffs/sales to Mobiuz."""
+    mobiuz = fetch_one(
+        conn,
+        "SELECT id FROM operators WHERE lower(trim(name)) = lower(trim(:name))",
+        {"name": "Mobiuz"},
+    )
+    if not mobiuz:
+        mobiuz_id = next_id(conn, "operators")
+        conn.execute(
+            text(
+                """
+                INSERT INTO operators(id, name, is_active, created_at)
+                VALUES(:id, :name, 1, :created_at)
+                """
+            ),
+            {"id": mobiuz_id, "name": "Mobiuz", "created_at": current_timestamp()},
+        )
+    else:
+        mobiuz_id = int(mobiuz["id"])
+
+    uzmobile = fetch_one(
+        conn,
+        "SELECT id FROM operators WHERE lower(trim(name)) = lower(trim(:name))",
+        {"name": "Uzmobile"},
+    )
+    if not uzmobile:
+        conn.execute(
+            text(
+                """
+                INSERT INTO operators(id, name, is_active, created_at)
+                VALUES(:id, :name, 1, :created_at)
+                """
+            ),
+            {"id": next_id(conn, "operators"), "name": "Uzmobile", "created_at": current_timestamp()},
+        )
+
+    conn.execute(
+        text("UPDATE tariffs SET operator_id = :mobiuz_id WHERE operator_id IS NULL OR operator_id = 0"),
+        {"mobiuz_id": mobiuz_id},
+    )
+
+    if engine.dialect.name == "postgresql":
+        constraints = conn.execute(
+            text(
+                """
+                SELECT c.conname
+                FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid
+                WHERE t.relname = 'tariffs'
+                  AND c.contype = 'u'
+                  AND pg_get_constraintdef(c.oid) IN ('UNIQUE (name)', 'UNIQUE(name)')
+                """
+            )
+        ).fetchall()
+        for row in constraints:
+            constraint_name = str(row[0]).replace('"', '""')
+            conn.execute(text(f'ALTER TABLE tariffs DROP CONSTRAINT IF EXISTS "{constraint_name}"'))
+
+    conn.execute(
+        text("CREATE UNIQUE INDEX IF NOT EXISTS uq_tariffs_operator_name ON tariffs(operator_id, name)")
+    )
 
 
 def login_required(func):
@@ -912,7 +1175,13 @@ def save_daily_sales(
 
         tariff_rows = fetch_all(
             conn,
-            "SELECT id, name FROM tariffs WHERE is_active = 1 AND COALESCE(bonus_per_item, 0) > 0 ORDER BY name",
+            """
+            SELECT t.id, t.name
+            FROM tariffs t
+            JOIN operators o ON o.id = t.operator_id
+            WHERE t.is_active = 1 AND o.is_active = 1 AND COALESCE(t.bonus_per_item, 0) > 0
+            ORDER BY o.name, t.name
+            """,
         )
         active_tariffs = {int(row["id"]): row["name"] for row in tariff_rows}
 
@@ -981,12 +1250,20 @@ def get_active_refs(
     include_employee_id, include_tariff_id = include_ids or (0, 0)
     if positive_tariffs_only:
         tariff_sql = """
-            SELECT * FROM tariffs
-            WHERE (is_active = 1 AND COALESCE(bonus_per_item, 0) > 0) OR id = :id
-            ORDER BY name
+            SELECT t.*, o.name AS operator_name
+            FROM tariffs t
+            JOIN operators o ON o.id = t.operator_id
+            WHERE ((t.is_active = 1 AND o.is_active = 1 AND COALESCE(t.bonus_per_item, 0) > 0) OR t.id = :id)
+            ORDER BY o.name, t.name
         """
     else:
-        tariff_sql = "SELECT * FROM tariffs WHERE is_active = 1 OR id = :id ORDER BY name"
+        tariff_sql = """
+            SELECT t.*, o.name AS operator_name
+            FROM tariffs t
+            JOIN operators o ON o.id = t.operator_id
+            WHERE t.is_active = 1 OR t.id = :id
+            ORDER BY o.name, t.name
+        """
     with engine.connect() as conn:
         employees = fetch_all(
             conn,
@@ -997,11 +1274,20 @@ def get_active_refs(
     return employees, tariffs
 
 
-def get_all_refs() -> tuple[list[Any], list[Any]]:
+def get_all_refs() -> tuple[list[Any], list[Any], list[Any]]:
     with engine.connect() as conn:
         employees = fetch_all(conn, "SELECT * FROM employees ORDER BY full_name")
-        tariffs = fetch_all(conn, "SELECT * FROM tariffs ORDER BY name")
-    return employees, tariffs
+        tariffs = fetch_all(
+            conn,
+            """
+            SELECT t.*, o.name AS operator_name
+            FROM tariffs t
+            JOIN operators o ON o.id = t.operator_id
+            ORDER BY o.name, t.name
+            """,
+        )
+        operators = fetch_all(conn, "SELECT * FROM operators ORDER BY is_active DESC, name")
+    return employees, tariffs, operators
 
 
 def get_filters() -> dict[str, Any]:
@@ -1009,6 +1295,7 @@ def get_filters() -> dict[str, Any]:
         "date_from": request.args.get("date_from", "").strip(),
         "date_to": request.args.get("date_to", "").strip(),
         "employee_id": parse_int(request.args.get("employee_id")),
+        "operator_id": parse_int(request.args.get("operator_id")),
         "tariff_id": parse_int(request.args.get("tariff_id")),
         "q": request.args.get("q", "").strip(),
     }
@@ -1018,10 +1305,12 @@ def fetch_sales(filters: dict[str, Any]) -> list[Any]:
     sql = [
         """
         SELECT s.*, e.full_name, t.name AS tariff_name, t.bonus_per_item,
+               o.id AS operator_id, o.name AS operator_name,
                (s.quantity * t.bonus_per_item) AS bonus_total
         FROM sales s
         JOIN employees e ON e.id = s.employee_id
         JOIN tariffs t ON t.id = s.tariff_id
+        JOIN operators o ON o.id = t.operator_id
         WHERE 1=1
         """
     ]
@@ -1035,63 +1324,89 @@ def fetch_sales(filters: dict[str, Any]) -> list[Any]:
     if filters["employee_id"]:
         sql.append("AND s.employee_id = :employee_id")
         params["employee_id"] = filters["employee_id"]
+    if filters["operator_id"]:
+        sql.append("AND t.operator_id = :operator_id")
+        params["operator_id"] = filters["operator_id"]
     if filters["tariff_id"]:
         sql.append("AND s.tariff_id = :tariff_id")
         params["tariff_id"] = filters["tariff_id"]
     if filters["q"]:
-        sql.append("AND (e.full_name LIKE :q OR t.name LIKE :q OR s.comment LIKE :q)")
+        sql.append("AND (e.full_name LIKE :q OR o.name LIKE :q OR t.name LIKE :q OR s.comment LIKE :q)")
         params["q"] = f"%{filters['q']}%"
-    sql.append("ORDER BY s.sale_date DESC, e.full_name, t.name")
+    sql.append("ORDER BY s.sale_date DESC, o.name, e.full_name, t.name")
     with engine.connect() as conn:
         return fetch_all(conn, " ".join(sql), params)
 
 
-def build_report(month: str) -> dict[str, Any]:
+def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
     if not is_valid_month(month):
         month = date.today().strftime("%Y-%m")
+    operator_where = " AND t.operator_id = :operator_id" if operator_id else ""
+    params = {"month": month, "operator_id": operator_id}
     with engine.connect() as conn:
         detail = fetch_all(
             conn,
-            """
-            SELECT e.full_name, t.name AS tariff_name, t.bonus_per_item,
+            f"""
+            SELECT o.name AS operator_name, e.full_name, t.name AS tariff_name, t.bonus_per_item,
                    SUM(s.quantity) AS total_qty,
                    SUM(s.quantity * t.bonus_per_item) AS total_bonus
             FROM sales s
             JOIN employees e ON e.id = s.employee_id
             JOIN tariffs t ON t.id = s.tariff_id
-            WHERE substr(s.sale_date, 1, 7) = :month
-            GROUP BY e.id, e.full_name, t.id, t.name, t.bonus_per_item
-            ORDER BY e.full_name, t.name
+            JOIN operators o ON o.id = t.operator_id
+            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+            GROUP BY o.id, o.name, e.id, e.full_name, t.id, t.name, t.bonus_per_item
+            ORDER BY o.name, e.full_name, t.name
             """,
-            {"month": month},
+            params,
         )
         summary = fetch_all(
             conn,
-            """
+            f"""
             SELECT e.full_name,
                    SUM(s.quantity) AS total_qty,
                    SUM(s.quantity * t.bonus_per_item) AS total_bonus
             FROM sales s
             JOIN employees e ON e.id = s.employee_id
             JOIN tariffs t ON t.id = s.tariff_id
-            WHERE substr(s.sale_date, 1, 7) = :month
+            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
             GROUP BY e.id, e.full_name
             ORDER BY total_bonus DESC, e.full_name
             """,
-            {"month": month},
+            params,
+        )
+        operator_summary = fetch_all(
+            conn,
+            f"""
+            SELECT o.id AS operator_id, o.name AS operator_name,
+                   SUM(s.quantity) AS total_qty,
+                   SUM(s.quantity * t.bonus_per_item) AS total_bonus
+            FROM sales s
+            JOIN tariffs t ON t.id = s.tariff_id
+            JOIN operators o ON o.id = t.operator_id
+            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+            GROUP BY o.id, o.name
+            ORDER BY o.name
+            """,
+            params,
         )
         totals = fetch_one(
             conn,
-            """
+            f"""
             SELECT COALESCE(SUM(s.quantity), 0) AS total_qty,
                    COALESCE(SUM(s.quantity * t.bonus_per_item), 0) AS total_bonus
             FROM sales s
             JOIN tariffs t ON t.id = s.tariff_id
-            WHERE substr(s.sale_date, 1, 7) = :month
+            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
             """,
-            {"month": month},
+            params,
         )
-    return {"detail": detail, "summary": summary, "totals": totals or {"total_qty": 0, "total_bonus": 0}}
+    return {
+        "detail": detail,
+        "summary": summary,
+        "operator_summary": operator_summary,
+        "totals": totals or {"total_qty": 0, "total_bonus": 0},
+    }
 
 
 def is_month_closed(month: str) -> bool:
@@ -1126,11 +1441,11 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
     ws = wb.active
     ws.title = "Ойлик ҳисобот"
     ws.append([f"I-MAX — SIM-карта сотувлари бўйича бонус ҳисоботи — {month}"])
-    ws.merge_cells("A1:E1")
+    ws.merge_cells("A1:F1")
     ws["A1"].font = Font(size=14, bold=True)
     ws["A1"].alignment = Alignment(horizontal="center")
     ws.append([])
-    ws.append(["Ходим Ф.И.О.", "Тариф номи", "Сони", "1 дона бонус", "Жами бонус"])
+    ws.append(["Оператор", "Ходим Ф.И.О.", "Тариф номи", "Сони", "1 дона бонус", "Жами бонус"])
     header_row = 3
     for cell in ws[header_row]:
         cell.font = Font(bold=True)
@@ -1139,6 +1454,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
 
     for row in data["detail"]:
         ws.append([
+            row["operator_name"],
             row["full_name"],
             tariff_name_display(row["tariff_name"]),
             row["total_qty"],
@@ -1146,7 +1462,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
             row["total_bonus"],
         ])
     ws.append([])
-    ws.append(["ЖАМИ", "", data["totals"]["total_qty"], "", data["totals"]["total_bonus"]])
+    ws.append(["ЖАМИ", "", "", data["totals"]["total_qty"], "", data["totals"]["total_bonus"]])
     total_row = ws.max_row
     for cell in ws[total_row]:
         cell.font = Font(bold=True)
@@ -1169,8 +1485,26 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
     for cell in ws2[ws2.max_row]:
         cell.font = Font(bold=True)
 
+    ws3 = wb.create_sheet("Операторлар бўйича")
+    ws3.append([f"I-MAX — операторлар бўйича натижа — {month}"])
+    ws3.merge_cells("A1:C1")
+    ws3["A1"].font = Font(size=14, bold=True)
+    ws3["A1"].alignment = Alignment(horizontal="center")
+    ws3.append([])
+    ws3.append(["Оператор", "Жами SIM", "Жами бонус"])
+    for cell in ws3[3]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="D9EAF7")
+        cell.alignment = Alignment(horizontal="center")
+    for row in data["operator_summary"]:
+        ws3.append([row["operator_name"], row["total_qty"], row["total_bonus"]])
+    ws3.append([])
+    ws3.append(["ЖАМИ", data["totals"]["total_qty"], data["totals"]["total_bonus"]])
+    for cell in ws3[ws3.max_row]:
+        cell.font = Font(bold=True)
+
     thin = Side(style="thin", color="CCCCCC")
-    for sheet in (ws, ws2):
+    for sheet in (ws, ws2, ws3):
         for row in sheet.iter_rows():
             for cell in row:
                 cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
