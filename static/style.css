@@ -527,3 +527,51 @@ input:focus,select:focus { border-color:#72a8f5; box-shadow:0 0 0 3px rgba(45,12
     .dashboard-filter-form { grid-template-columns:1fr; }
     .dashboard-filter-form .btn { grid-column:auto; }
 }
+
+/* Operator-separated employee totals in monthly report */
+.operator-report-group {
+    margin-top: 18px;
+    border: 1px solid var(--border, #dbe5f1);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+}
+.operator-report-group:first-of-type { margin-top: 10px; }
+.operator-report-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 13px 16px;
+    background: #eaf3ff;
+    color: #17365d;
+    font-weight: 800;
+}
+.operator-report-total {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2563eb;
+    white-space: nowrap;
+}
+.operator-report-group .table-wrap { border: 0; border-radius: 0; }
+.report-grand-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 18px;
+    padding: 15px 17px;
+    border-radius: 12px;
+    background: #dbeafe;
+    color: #17365d;
+    font-weight: 800;
+}
+@media (max-width: 640px) {
+    .operator-report-title,
+    .report-grand-total {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .operator-report-total { white-space: normal; }
+}
