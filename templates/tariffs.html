@@ -1,10 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Тарифлар{% endblock %}
-{% block header %}Тарифлар{% endblock %}
+{% block header %}Операторлар тарифлари{% endblock %}
+{% block subheader %}Ҳар бир операторнинг тарифлари ва бир дона SIM учун бонус миқдори{% endblock %}
 {% block content %}
 <section class="panel">
     <div class="panel-title">Янги тариф қўшиш</div>
-    <form method="post" action="{{ url_for('add_tariff') }}" class="inline-form">
+    <form method="post" action="{{ url_for('add_tariff') }}" class="inline-form tariff-operator-form">
+        <select name="operator_id" required>
+            <option value="">Операторни танланг...</option>
+            {% for operator in operators %}
+                {% if operator.is_active %}<option value="{{ operator.id }}">{{ operator.name }}</option>{% endif %}
+            {% endfor %}
+        </select>
         <input type="text" name="name" placeholder="Тариф номи" required>
         <input type="number" name="bonus_per_item" placeholder="1 дона бонус" min="0" required>
         <button type="submit" class="btn primary">Қўшиш</button>
@@ -12,15 +19,38 @@
 </section>
 
 <section class="panel">
+    <div class="panel-title">Фильтр</div>
+    <form method="get" class="toolbar">
+        <label>Оператор
+            <select name="operator_id">
+                <option value="0">Барча операторлар</option>
+                {% for operator in operators %}
+                    <option value="{{ operator.id }}" {% if operator_id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button type="submit" class="btn">Кўрсатиш</button>
+        <a href="{{ url_for('tariffs') }}" class="btn ghost">Тозалаш</a>
+    </form>
+</section>
+
+<section class="panel">
     <div class="panel-title">Тарифлар рўйхати</div>
     <div class="table-wrap">
         <table>
-            <thead><tr><th>№</th><th>Тариф номи</th><th>1 дона бонус</th><th>Ҳолати</th><th>Амал</th></tr></thead>
+            <thead><tr><th>№</th><th>Оператор</th><th>Тариф номи</th><th>1 дона бонус</th><th>Ҳолати</th><th>Амал</th></tr></thead>
             <tbody>
             {% for row in rows %}
             <tr>
                 <form method="post" action="{{ url_for('edit_tariff', tariff_id=row.id) }}">
                     <td>{{ loop.index }}</td>
+                    <td>
+                        <select name="operator_id" required>
+                            {% for operator in operators %}
+                                <option value="{{ operator.id }}" {% if row.operator_id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
                     <td><input type="text" name="name" value="{{ row.name|tariff_name }}" required></td>
                     <td><input type="number" name="bonus_per_item" value="{{ row.bonus_per_item }}" min="0" required></td>
                     <td class="center"><label class="check"><input type="checkbox" name="is_active" {% if row.is_active %}checked{% endif %}> Фаол</label></td>
@@ -28,7 +58,7 @@
                 </form>
             </tr>
             {% else %}
-            <tr><td colspan="5" class="empty">Ҳали тариф киритилмаган</td></tr>
+            <tr><td colspan="6" class="empty">Ҳали тариф киритилмаган</td></tr>
             {% endfor %}
             </tbody>
         </table>

@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{% if sale %}Сотувни ўзгартириш{% else %}Кунлик сотув киритиш{% endif %}{% endblock %}
 {% block header %}{% if sale %}Сотувни ўзгартириш{% else %}Кунлик сотув киритиш{% endif %}{% endblock %}
+{% block subheader %}SIM-карталарни оператор ва тарифлар кесимида киритиш{% endblock %}
 {% block content %}
 <section class="panel {% if sale %}narrow{% else %}daily-sale-panel{% endif %}">
     <div class="panel-title">{% if sale %}Маълумотни таҳрирлаш{% else %}Янги кунлик сотув{% endif %}</div>
     {% if not employees or not tariffs %}
-        <div class="alert warning">Аввал ходим ва тариф киритинг.</div>
+        <div class="alert warning">Аввал ходим, оператор ва тариф киритинг.</div>
     {% endif %}
 
     {% if sale %}
@@ -21,17 +22,22 @@
                 {% endfor %}
             </select>
         </label>
-        <label>Тариф номи
+        <label class="span-2">Оператор ва тариф
             <select name="tariff_id" required>
                 <option value="">Танланг...</option>
-                {% for tariff in tariffs %}
-                    <option value="{{ tariff.id }}" {% if sale and sale.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name|tariff_name }}</option>
+                {% for group in tariffs|groupby('operator_name') %}
+                    <optgroup label="{{ group.grouper }}">
+                    {% for tariff in group.list %}
+                        <option value="{{ tariff.id }}" {% if sale and sale.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name|tariff_name }}</option>
+                    {% endfor %}
+                    </optgroup>
                 {% endfor %}
             </select>
         </label>
         <label>Сотилган SIM-карта сони
             <input type="number" name="quantity" value="{{ sale.quantity if sale else '' }}" min="1" required>
         </label>
+        <div class="alert info">Оператор тариф билан бирга танланади. Тариф рўйхати операторлар бўйича гуруҳланган.</div>
         <label class="span-2">Изоҳ
             <input type="text" name="comment" value="{{ sale.comment if sale and sale.comment else '' }}" placeholder="Ихтиёрий">
         </label>
@@ -63,21 +69,26 @@
         </div>
 
         <div class="alert info daily-hint">
-            Сана ва ходимни танланг. Кейин ҳар бир тариф бўйича сотилган сонини киритинг. Сотув бўлмаган тарифларни бўш қолдириш мумкин.
+            Тарифлар операторлар бўйича алоҳида гуруҳланган. Ҳар бир оператор учун сотилган SIM-карталар сонини тегишли тариф қаторига киритинг.
         </div>
 
         <div class="tariff-entry-list">
-            {% for tariff in tariffs %}
-            <div class="tariff-entry-row">
-                <div class="tariff-entry-info">
-                    <div class="tariff-entry-name">{{ tariff.name|tariff_name }}</div>
+            {% for group in tariffs|groupby('operator_name') %}
+            <div class="operator-tariff-group">
+                <div class="operator-tariff-title">{{ group.grouper }}</div>
+                {% for tariff in group.list %}
+                <div class="tariff-entry-row">
+                    <div class="tariff-entry-info">
+                        <div class="tariff-entry-name">{{ tariff.name|tariff_name }}</div>
+                    </div>
+                    <label class="tariff-entry-qty">Сони
+                        <input type="number" name="quantity_{{ tariff.id }}" min="0" step="1" inputmode="numeric" placeholder="0">
+                    </label>
                 </div>
-                <label class="tariff-entry-qty">Сони
-                    <input type="number" name="quantity_{{ tariff.id }}" min="0" step="1" inputmode="numeric" placeholder="0">
-                </label>
+                {% endfor %}
             </div>
             {% else %}
-            <div class="empty">Киритиш учун актив тариф топилмади. Тариф қиймати 0 дан катта бўлса, шу рўйхатда чиқади.</div>
+            <div class="empty">Киритиш учун актив тариф топилмади. Аввал оператор ва тариф қўшинг.</div>
             {% endfor %}
         </div>
 

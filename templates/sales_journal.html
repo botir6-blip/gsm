@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Сотувлар журнали{% endblock %}
 {% block header %}Сотувлар журнали{% endblock %}
+{% block subheader %}Оператор, тариф ва ходимлар кесимида киритилган SIM-карталар{% endblock %}
 {% block content %}
 <section class="panel">
     <div class="panel-title">Фильтрлар</div>
@@ -10,6 +11,14 @@
         </label>
         <label>Санагача
             <input type="date" name="date_to" value="{{ filters.date_to }}">
+        </label>
+        <label>Оператор
+            <select name="operator_id">
+                <option value="0">Ҳаммаси</option>
+                {% for operator in operators %}
+                    <option value="{{ operator.id }}" {% if filters.operator_id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                {% endfor %}
+            </select>
         </label>
         <label>Ходим
             <select name="employee_id">
@@ -22,13 +31,17 @@
         <label>Тариф
             <select name="tariff_id">
                 <option value="0">Ҳаммаси</option>
-                {% for tariff in tariffs %}
-                    <option value="{{ tariff.id }}" {% if filters.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name|tariff_name }}</option>
+                {% for group in tariffs|groupby('operator_name') %}
+                    <optgroup label="{{ group.grouper }}">
+                    {% for tariff in group.list %}
+                        <option value="{{ tariff.id }}" {% if filters.tariff_id == tariff.id %}selected{% endif %}>{{ tariff.name|tariff_name }}</option>
+                    {% endfor %}
+                    </optgroup>
                 {% endfor %}
             </select>
         </label>
         <label>Қидириш
-            <input type="text" name="q" value="{{ filters.q }}" placeholder="Ф.И.О., тариф, изоҳ">
+            <input type="text" name="q" value="{{ filters.q }}" placeholder="Ф.И.О., оператор, тариф, изоҳ">
         </label>
         <div class="filter-actions">
             <button class="btn" type="submit">Кўрсатиш</button>
@@ -46,13 +59,14 @@
         <table>
             <thead>
             <tr>
-                <th>Сана</th><th>Ходим Ф.И.О.</th><th>Тариф</th><th>Сони</th><th>1 дона бонус</th><th>Жами бонус</th><th>Изоҳ</th><th>Амал</th>
+                <th>Сана</th><th>Оператор</th><th>Ходим Ф.И.О.</th><th>Тариф</th><th>Сони</th><th>1 дона бонус</th><th>Жами бонус</th><th>Изоҳ</th><th>Амал</th>
             </tr>
             </thead>
             <tbody>
             {% for row in rows %}
             <tr>
                 <td>{{ row.sale_date }}</td>
+                <td><span class="operator-badge">{{ row.operator_name }}</span></td>
                 <td>{{ row.full_name }}</td>
                 <td>{{ row.tariff_name|tariff_name }}</td>
                 <td class="num">{{ row.quantity|qty }}</td>
@@ -68,7 +82,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="empty">Маълумот топилмади</td></tr>
+            <tr><td colspan="9" class="empty">Маълумот топилмади</td></tr>
             {% endfor %}
             </tbody>
         </table>

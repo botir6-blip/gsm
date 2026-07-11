@@ -1,15 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Бош саҳифа | I-MAX{% endblock %}
 {% block header %}I-MAX назорат панели{% endblock %}
-{% block subheader %}Кунлик сотув, ойлик натижа ва бонуслар ҳолати{% endblock %}
+{% block subheader %}Операторлар бўйича кунлик сотув, ойлик натижа ва бонуслар ҳолати{% endblock %}
 {% block content %}
 <section class="hero-banner panel">
     <div>
         <div class="hero-eyebrow">I-MAX</div>
         <h2>SIM бонусларни бошқариш маркази</h2>
-        <p>Бу ерда кунлик киритилган маълумотлар, ойлик жами сотув ва бонус натижаларини бир жойда кўрасиз.</p>
+        <p>Mobiuz, Uzmobile ва бошқа операторлар бўйича кунлик сотувлар ҳамда ойлик бонус натижаларини бир жойда кўрасиз.</p>
     </div>
     <form method="get" class="toolbar hero-toolbar">
+        <label>Оператор
+            <select name="operator_id">
+                <option value="0">Барча операторлар</option>
+                {% for operator in operators %}
+                    <option value="{{ operator.id }}" {% if operator_id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
         <label>Ой
             <input type="month" name="month" value="{{ month }}">
         </label>
@@ -36,7 +44,7 @@
     <section class="panel">
         <div class="panel-head">
             <div class="panel-title">Ходимлар бўйича ТОП</div>
-            <span class="panel-tag">I-MAX</span>
+            <span class="panel-tag">{% if operator_id %}Танланган оператор{% else %}Барча операторлар{% endif %}</span>
         </div>
         <div class="table-wrap">
             <table>
@@ -54,16 +62,16 @@
     <section class="panel">
         <div class="panel-head">
             <div class="panel-title">Тарифлар бўйича ТОП</div>
-            <span class="panel-tag">I-MAX</span>
+            <span class="panel-tag">Оператор кесимида</span>
         </div>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Тариф номи</th><th>Сони</th></tr></thead>
+                <thead><tr><th>Оператор</th><th>Тариф номи</th><th>Сони</th></tr></thead>
                 <tbody>
                 {% for row in top_tariffs %}
-                    <tr><td>{{ row.name|tariff_name }}</td><td class="num">{{ row.qty|qty }}</td></tr>
+                    <tr><td>{{ row.operator_name }}</td><td>{{ row.name|tariff_name }}</td><td class="num">{{ row.qty|qty }}</td></tr>
                 {% else %}
-                    <tr><td colspan="2" class="empty">Маълумот йўқ</td></tr>
+                    <tr><td colspan="3" class="empty">Маълумот йўқ</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

@@ -28,6 +28,7 @@
         <nav class="nav">
             <a class="nav-link {{ 'active' if active == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Бош саҳифа</a>
             <a class="nav-link {{ 'active' if active == 'employees' else '' }}" href="{{ url_for('employees') }}">Ходимлар</a>
+            <a class="nav-link {{ 'active' if active == 'operators' else '' }}" href="{{ url_for('operators') }}">Операторлар</a>
             <a class="nav-link {{ 'active' if active == 'tariffs' else '' }}" href="{{ url_for('tariffs') }}">Тарифлар</a>
             <a class="nav-link {{ 'active' if active == 'sale_new' else '' }}" href="{{ url_for('sale_new') }}">Кунлик сотув киритиш</a>
             <a class="nav-link {{ 'active' if active == 'sales_journal' else '' }}" href="{{ url_for('sales_journal') }}">Сотувлар журнали</a>
@@ -38,7 +39,7 @@
         </nav>
         <div class="sidebar-note">
             <div class="sidebar-note-title">I-MAX</div>
-            <div class="sidebar-note-text">Тарифлар кесимида ходимлар натижасини назорат қилиш ва ойлик бонусни тез ҳисоблаш учун қулай интерфейс.</div>
+            <div class="sidebar-note-text">Mobiuz, Uzmobile ва бошқа операторлар кесимида SIM-карта сотуви ҳамда бонусларни назорат қилиш учун қулай интерфейс.</div>
         </div>
     </aside>
     <main class="content">
@@ -46,7 +47,7 @@
             <div>
                 <div class="brand-line">I-MAX</div>
                 <h1>{% block header %}I-MAX SIM Бонус{% endblock %}</h1>
-                <p>{% block subheader %}Тарифлар бўйича кунлик кирим ва ойлик бонус ҳисоботи{% endblock %}</p>
+                <p>{% block subheader %}Оператор ва тарифлар бўйича кунлик сотув ҳамда ойлик бонус ҳисоботи{% endblock %}</p>
             </div>
             <div class="topbar-actions">
                 <button type="button" id="installAppButton" class="btn small install-app-button" hidden>Илова сифатида ўрнатиш</button>
@@ -63,7 +64,7 @@
             {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
-        <footer class="footer-note">© {{ current_year }} I-MAX — SIM тарифлар ва бонуслар ҳисоби</footer>
+        <footer class="footer-note">© {{ current_year }} I-MAX — SIM операторлар, тарифлар ва бонуслар ҳисоби</footer>
     </main>
 </div>
 </body>
