@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Ойлик ҳисобот{% endblock %}
-{% block header %}Ойлик ҳисобот{% endblock %}
-{% block subheader %}Оператор, тариф ва ходимлар бўйича SIM-карта сотувлари ҳамда бонуслар{% endblock %}
+{% block title %}Период бўйича ҳисобот{% endblock %}
+{% block header %}Период бўйича ҳисобот{% endblock %}
+{% block subheader %}Танланган сана оралиғида оператор, тариф ва ходимлар бўйича SIM-карта сотувлари ҳамда бонуслар{% endblock %}
 {% block content %}
 <section class="panel">
     <div class="panel-title">Ҳисобот параметрлари</div>
@@ -14,31 +14,45 @@
                 {% endfor %}
             </select>
         </label>
-        <label>Ой
-            <input type="month" name="month" value="{{ month }}">
+        <label>Бошланиш санаси
+            <input type="date" name="date_from" value="{{ date_from }}" required>
+        </label>
+        <label>Тугаш санаси
+            <input type="date" name="date_to" value="{{ date_to }}" required>
         </label>
         <button class="btn" type="submit">Кўрсатиш</button>
-        <a class="btn primary" href="{{ url_for('report_export', month=month, operator_id=operator_id) }}">Excel’га юклаш</a>
+        <a class="btn primary" href="{{ url_for('report_export', date_from=date_from, date_to=date_to, operator_id=operator_id) }}">Excel’га юклаш</a>
     </form>
+
+    {% if lock_month %}
     <div class="month-status">
         {% if closed %}
-            <span class="badge locked">Ой ёпилган</span>
+            <span class="badge locked">{{ lock_month }} ойи ёпилган</span>
             <form method="post" action="{{ url_for('month_open') }}" class="mini-form">
-                <input type="hidden" name="month" value="{{ month }}">
+                <input type="hidden" name="month" value="{{ lock_month }}">
+                <input type="hidden" name="date_from" value="{{ date_from }}">
+                <input type="hidden" name="date_to" value="{{ date_to }}">
                 <input type="hidden" name="operator_id" value="{{ operator_id }}">
                 <input type="text" name="reason" placeholder="Қайта очиш сабаби" required>
                 <button class="btn small" type="submit">Ойни қайта очиш</button>
             </form>
         {% else %}
-            <span class="badge open">Ой очиқ</span>
+            <span class="badge open">{{ lock_month }} ойи очиқ</span>
             <form method="post" action="{{ url_for('month_close') }}" class="mini-form">
-                <input type="hidden" name="month" value="{{ month }}">
+                <input type="hidden" name="month" value="{{ lock_month }}">
+                <input type="hidden" name="date_from" value="{{ date_from }}">
+                <input type="hidden" name="date_to" value="{{ date_to }}">
                 <input type="hidden" name="operator_id" value="{{ operator_id }}">
                 <button class="btn small danger-btn" type="submit" onclick="return confirm('Ой ёпилса, барча операторлар маълумотлари ўзгартирилмайди. Давом этасизми?')">Ойни ёпиш</button>
             </form>
         {% endif %}
         <span class="muted small">Ойни ёпиш ҳозирча барча операторларга умумий амал қилади.</span>
     </div>
+    {% else %}
+    <div class="month-status">
+        <span class="muted small">Ойни ёпиш/қайта очиш учун периодни тўлиқ бир календар ой қилиб танланг (масалан, 01.08.2026–31.08.2026).</span>
+    </div>
+    {% endif %}
 </section>
 
 <div class="cards-grid">
@@ -61,7 +75,7 @@
             {% for row in operator_summary %}
             <tr><td>{{ row.operator_name }}</td><td class="num">{{ row.total_qty|qty }}</td><td class="num strong">{{ row.total_bonus|money }}</td></tr>
             {% else %}
-            <tr><td colspan="3" class="empty">Маълумот йўқ</td></tr>
+            <tr><td colspan="3" class="empty">Танланган период учун маълумот йўқ</td></tr>
             {% endfor %}
             </tbody>
             <tfoot><tr><th>ЖАМИ</th><th class="num">{{ totals.total_qty|qty }}</th><th class="num">{{ totals.total_bonus|money }}</th></tr></tfoot>
@@ -85,7 +99,7 @@
                 <td class="num strong">{{ row.total_bonus|money }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="6" class="empty">Бу ой учун маълумот йўқ</td></tr>
+            <tr><td colspan="6" class="empty">Танланган период учун маълумот йўқ</td></tr>
             {% endfor %}
             </tbody>
             <tfoot><tr><th colspan="3">ЖАМИ</th><th class="num">{{ totals.total_qty|qty }}</th><th></th><th class="num">{{ totals.total_bonus|money }}</th></tr></tfoot>
@@ -125,7 +139,7 @@
         </div>
     </div>
     {% else %}
-    <div class="empty">Маълумот йўқ</div>
+    <div class="empty">Танланган период учун маълумот йўқ</div>
     {% endfor %}
 
     {% if employee_summary_by_operator|length > 1 %}
