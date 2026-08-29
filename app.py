@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 import os
 import re
 import tempfile
@@ -653,18 +654,21 @@ def create_app() -> Flask:
     @app.route("/report")
     @login_required
     def report() -> str:
-        month = request.args.get("month") or date.today().strftime("%Y-%m")
+        date_from, date_to = normalize_report_period(request.args)
         operator_id = parse_int(request.args.get("operator_id"))
-        data = build_report(month, operator_id)
-        closed = is_month_closed(month)
+        data = build_report(date_from, date_to, operator_id)
+        lock_month = full_month_for_period(date_from, date_to)
+        closed = is_month_closed(lock_month) if lock_month else False
         with engine.connect() as conn:
             operators_list = fetch_all(conn, "SELECT * FROM operators ORDER BY is_active DESC, name")
         return render_template(
             "report.html",
             active="report",
-            month=month,
+            date_from=date_from,
+            date_to=date_to,
             operator_id=operator_id,
             operators=operators_list,
+            lock_month=lock_month,
             closed=closed,
             **data,
         )
@@ -672,24 +676,29 @@ def create_app() -> Flask:
     @app.route("/report/export")
     @login_required
     def report_export() -> Response:
-        month = request.args.get("month") or date.today().strftime("%Y-%m")
+        date_from, date_to = normalize_report_period(request.args)
         operator_id = parse_int(request.args.get("operator_id"))
-        data = build_report(month, operator_id)
+        data = build_report(date_from, date_to, operator_id)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         tmp.close()
         file_path = Path(tmp.name)
-        create_excel_report(file_path, month, data)
+        create_excel_report(file_path, date_from, date_to, data)
         suffix = f"_operator_{operator_id}" if operator_id else "_barcha_operatorlar"
-        return send_file(file_path, as_attachment=True, download_name=f"bonus_hisobot_{month}{suffix}.xlsx")
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=f"bonus_hisobot_{date_from}_{date_to}{suffix}.xlsx",
+        )
 
     @app.route("/month/close", methods=["POST"])
     @login_required
     def month_close() -> Response:
         month = request.form.get("month", "").strip()
         operator_id = parse_int(request.form.get("operator_id"))
+        date_from, date_to = normalize_report_period(request.form)
         if not is_valid_month(month):
             flash("Ой формати нотўғри.", "danger")
-            return redirect(url_for("report", operator_id=operator_id))
+            return redirect(url_for("report", date_from=date_from, date_to=date_to, operator_id=operator_id))
         with engine.begin() as conn:
             existing = fetch_one(conn, "SELECT month FROM month_locks WHERE month = :month", {"month": month})
             if not existing:
@@ -699,22 +708,23 @@ def create_app() -> Flask:
                 )
                 add_audit(conn, "Ой ёпилди", month)
         flash(f"{month} ойи ёпилди.", "success")
-        return redirect(url_for("report", month=month, operator_id=operator_id))
+        return redirect(url_for("report", date_from=date_from, date_to=date_to, operator_id=operator_id))
 
     @app.route("/month/open", methods=["POST"])
     @login_required
     def month_open() -> Response:
         month = request.form.get("month", "").strip()
         operator_id = parse_int(request.form.get("operator_id"))
+        date_from, date_to = normalize_report_period(request.form)
         reason = request.form.get("reason", "").strip()
         if not reason:
             flash("Ойни қайта очиш сабаби киритилиши шарт.", "danger")
-            return redirect(url_for("report", month=month, operator_id=operator_id))
+            return redirect(url_for("report", date_from=date_from, date_to=date_to, operator_id=operator_id))
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM month_locks WHERE month = :month"), {"month": month})
             add_audit(conn, "Ой қайта очилди", f"{month}; сабаб: {reason}")
         flash(f"{month} ойи қайта очилди.", "success")
-        return redirect(url_for("report", month=month, operator_id=operator_id))
+        return redirect(url_for("report", date_from=date_from, date_to=date_to, operator_id=operator_id))
 
     @app.route("/audit")
     @login_required
@@ -1133,6 +1143,57 @@ def is_valid_month(value: str) -> bool:
         return False
 
 
+def month_bounds(month: str) -> tuple[str, str]:
+    """Return first/last ISO dates for a YYYY-MM month."""
+    parsed = datetime.strptime(month, "%Y-%m")
+    last_day = calendar.monthrange(parsed.year, parsed.month)[1]
+    return (
+        date(parsed.year, parsed.month, 1).isoformat(),
+        date(parsed.year, parsed.month, last_day).isoformat(),
+    )
+
+
+def normalize_report_period(values: Any) -> tuple[str, str]:
+    """Normalize report range and keep backward compatibility with old ?month=YYYY-MM links."""
+    today = date.today()
+    default_from = today.replace(day=1).isoformat()
+    default_to = today.isoformat()
+
+    raw_from = str(values.get("date_from", "") or "").strip()
+    raw_to = str(values.get("date_to", "") or "").strip()
+
+    if not raw_from and not raw_to:
+        legacy_month = str(values.get("month", "") or "").strip()
+        if is_valid_month(legacy_month):
+            return month_bounds(legacy_month)
+
+    date_from = raw_from if is_valid_date(raw_from) else default_from
+    date_to = raw_to if is_valid_date(raw_to) else default_to
+    if date_from > date_to:
+        date_from, date_to = date_to, date_from
+    return date_from, date_to
+
+
+def full_month_for_period(date_from: str, date_to: str) -> str | None:
+    """Return YYYY-MM only when the selected period is exactly one full calendar month."""
+    if not is_valid_date(date_from) or not is_valid_date(date_to):
+        return None
+    start = datetime.strptime(date_from, "%Y-%m-%d").date()
+    end = datetime.strptime(date_to, "%Y-%m-%d").date()
+    if (start.year, start.month) != (end.year, end.month) or start.day != 1:
+        return None
+    last_day = calendar.monthrange(start.year, start.month)[1]
+    if end.day != last_day:
+        return None
+    return start.strftime("%Y-%m")
+
+
+def format_period_label(date_from: str, date_to: str) -> str:
+    start = datetime.strptime(date_from, "%Y-%m-%d").strftime("%d.%m.%Y")
+    end = datetime.strptime(date_to, "%Y-%m-%d").strftime("%d.%m.%Y")
+    return start if date_from == date_to else f"{start} — {end}"
+
+
 def validate_sale_form(sale_date: str, employee_id: int, tariff_id: int, quantity: int) -> str | None:
     if not is_valid_date(sale_date):
         return "Сана нотўғри киритилган."
@@ -1363,11 +1424,11 @@ def fetch_sales(filters: dict[str, Any]) -> list[Any]:
         return fetch_all(conn, " ".join(sql), params)
 
 
-def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
-    if not is_valid_month(month):
-        month = date.today().strftime("%Y-%m")
+def build_report(date_from: str, date_to: str, operator_id: int = 0) -> dict[str, Any]:
+    date_from, date_to = normalize_report_period({"date_from": date_from, "date_to": date_to})
     operator_where = " AND t.operator_id = :operator_id" if operator_id else ""
-    params = {"month": month, "operator_id": operator_id}
+    params = {"date_from": date_from, "date_to": date_to, "operator_id": operator_id}
+    period_where = "s.sale_date >= :date_from AND s.sale_date <= :date_to"
     with engine.connect() as conn:
         detail = fetch_all(
             conn,
@@ -1379,7 +1440,7 @@ def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
             JOIN employees e ON e.id = s.employee_id
             JOIN tariffs t ON t.id = s.tariff_id
             JOIN operators o ON o.id = t.operator_id
-            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+            WHERE {period_where} {operator_where}
             GROUP BY o.id, o.name, e.id, e.full_name, t.id, t.name, t.bonus_per_item
             ORDER BY o.name, e.full_name, t.name
             """,
@@ -1396,7 +1457,7 @@ def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
             JOIN employees e ON e.id = s.employee_id
             JOIN tariffs t ON t.id = s.tariff_id
             JOIN operators o ON o.id = t.operator_id
-            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+            WHERE {period_where} {operator_where}
             GROUP BY o.id, o.name, e.id, e.full_name
             ORDER BY o.name, total_bonus DESC, e.full_name
             """,
@@ -1411,7 +1472,7 @@ def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
             FROM sales s
             JOIN tariffs t ON t.id = s.tariff_id
             JOIN operators o ON o.id = t.operator_id
-            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+            WHERE {period_where} {operator_where}
             GROUP BY o.id, o.name
             ORDER BY o.name
             """,
@@ -1424,7 +1485,7 @@ def build_report(month: str, operator_id: int = 0) -> dict[str, Any]:
                    COALESCE(SUM(s.quantity * t.bonus_per_item), 0) AS total_bonus
             FROM sales s
             JOIN tariffs t ON t.id = s.tariff_id
-            WHERE substr(s.sale_date, 1, 7) = :month {operator_where}
+            WHERE {period_where} {operator_where}
             """,
             params,
         )
@@ -1481,11 +1542,12 @@ def add_audit(conn, action: str, details: str) -> None:
     )
 
 
-def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> None:
+def create_excel_report(file_path: Path, date_from: str, date_to: str, data: dict[str, Any]) -> None:
+    period_label = format_period_label(date_from, date_to)
     wb = Workbook()
     ws = wb.active
-    ws.title = "Ойлик ҳисобот"
-    ws.append([f"I-MAX — SIM-карта сотувлари бўйича бонус ҳисоботи — {month}"])
+    ws.title = "Период ҳисоботи"
+    ws.append([f"I-MAX — SIM-карта сотувлари бўйича бонус ҳисоботи — {period_label}"])
     ws.merge_cells("A1:F1")
     ws["A1"].font = Font(size=14, bold=True)
     ws["A1"].alignment = Alignment(horizontal="center")
@@ -1513,7 +1575,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
         cell.font = Font(bold=True)
 
     ws2 = wb.create_sheet("Ходимлар бўйича жами")
-    ws2.append([f"I-MAX — ходимлар бўйича операторлар кесимида — {month}"])
+    ws2.append([f"I-MAX — ходимлар бўйича операторлар кесимида — {period_label}"])
     ws2.merge_cells("A1:C1")
     ws2["A1"].font = Font(size=14, bold=True)
     ws2["A1"].alignment = Alignment(horizontal="center")
@@ -1547,7 +1609,7 @@ def create_excel_report(file_path: Path, month: str, data: dict[str, Any]) -> No
         cell.fill = PatternFill("solid", fgColor="D9EAF7")
 
     ws3 = wb.create_sheet("Операторлар бўйича")
-    ws3.append([f"I-MAX — операторлар бўйича натижа — {month}"])
+    ws3.append([f"I-MAX — операторлар бўйича натижа — {period_label}"])
     ws3.merge_cells("A1:C1")
     ws3["A1"].font = Font(size=14, bold=True)
     ws3["A1"].alignment = Alignment(horizontal="center")
